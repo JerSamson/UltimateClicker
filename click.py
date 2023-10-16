@@ -1,77 +1,34 @@
 import win32api, win32con
 import time
 import os
-import math
 from pynput.mouse import Listener
-from threading import Thread, Timer
 import getpixelcolor
-from enum import Enum
+from threading import Thread
+import PySimpleGUI as sg
 
-class RepeatedTimer(object):
-    def __init__(self, interval, function, *args, **kwargs):
-        self._timer     = None
-        self.interval   = interval
-        self.function   = function
-        self.args       = args
-        self.kwargs     = kwargs
-        self.is_running = False
-        self.start()
+from DetectionMode import detectionMode
+from RepeatedTimer import RepeatedTimer
+from Target import *
+from ClickQueue import ClickQueue
+from queue import Queue
 
-    def _run(self):
-        self.is_running = False
-        self.start()
-        self.function(*self.args, **self.kwargs)
-
-    def start(self):
-        if not self.is_running:
-            self._timer = Timer(self.interval, self._run)
-            self._timer.start()
-            self.is_running = True
-
-    def stop(self):
-        self._timer.cancel()
-        self.is_running = False
-
-class detectionMode(Enum):
-    different = 1
-    same      = 2
-    change    = 3
 
 class clicker():
     def __init__(self) -> None:
+
+        self.queue = ClickQueue()
         self.idle_delay = 120
 
-        self.nb_clicks   = 0
-        self.nb_clicks_theo = 0
-        self.last_nb_clicks_theo = 0
-        self.last_nb_clicks = 0
-        self.last_cps_time = None
-        self.first_click_time = 0
-        self.most_efficient_delay = 1
-        self.highest_cps = 0
-        self.start       = time.time()
-
-        self.cps         = 0
-        self.fast_delay  = 0.0001
-
-        self.zone_area = 5 #pixel
-
         self.active = True
+        self.stopped   = False
         self.stop_on_move = True
-
-        self.single_target = None
-
-        self.targets = []
-        self.nb_targets = 0
-        self.target_mode = detectionMode.different
-        self.acquisition_min_dist = 300
-        self.check_for_targets = False
-        self.setting_targets = False
 
         self.x = 0
         self.y = 0 
 
 
+    def add_target2Queue(self, tar):
+        self.queue.add_target(tar)
 
     def stop(self):
         self.active = False
@@ -109,6 +66,8 @@ class clicker():
     def add_target(self, target, color=(0, 0, 0, 0), reverse=False):
         self.targets.append({target, color, reverse})
 
+
+
     def click(self, target):
         self.click(target[0], target[1])
     def click(self, x,y):
@@ -124,44 +83,7 @@ class clicker():
         win32api.mouse_event(win32con.MOUSEEVENTF_LEFTDOWN,x,y,0,0)
         win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP,x,y,0,0)
 
-# =-=-=-=-= MODES =-=-=-=-=
 
-    def idle_presence(self):
-        self.last_click = time.time()
-        self.click(self.single_target[0], self.single_target[1])
-        time.sleep(0.5)
-        self.click(self.single_target[0], self.single_target[1])
-
-    def fast_click(self):
-        self.last_cps_time = time.time()
-        rt = RepeatedTimer(0.1, self.update_cps)
-        while self.active:
-            self.click(self.single_target[0], self.single_target[1])
-            self.nb_clicks_theo += 1
-
-            time.sleep(self.fast_delay)
-        rt.stop()
-
-    def detect_color_change(self):
-        while self.active:
-            if self.check_for_targets:
-                for tar in self.targets:
-                    cur_avg = getpixelcolor.average(tar[0][0], tar[0][1], self.zone_area, self.zone_area)
-                    init_avg = tar[1]
-
-                    if tar[2] == detectionMode.same:
-                        if cur_avg == init_avg:
-                            self.click(tar[0][0], tar[0][1])
-                    elif tar[2] == detectionMode.different:
-                        if cur_avg != init_avg:
-                            self.click(tar[0][0], tar[0][1])
-                    elif tar[2] == detectionMode.change:
-                        if cur_avg != init_avg:
-                            self.click(tar[0][0], tar[0][1])
-                            self.targets.remove(tar)
-                            self.targets.append((tar[0], cur_avg, tar[2]))
-                            time.sleep(0.5)
-            time.sleep(0.1)
             
     def click_color_change(self):
         self.stop_on_move = False
@@ -179,49 +101,16 @@ class clicker():
         t = Thread(target=self.detect_color_change, daemon=True)
 
         t.start()
-# =-=-=-=-= INFO =-=-=-=-=
-    def update_cps(self):
-        if self.first_click_time == 0:
-            return
-        
-        self.cps = (self.nb_clicks - self.last_nb_clicks)/(time.time() - self.last_cps_time)
-        self.cps_theo = (self.nb_clicks_theo - self.last_nb_clicks_theo)/(time.time() - self.last_cps_time)
-        self.last_cps_time = time.time()
-        self.last_nb_clicks= self.nb_clicks
-        self.last_nb_clicks_theo = self.nb_clicks_theo
-        if self.cps > self.highest_cps:
-            self.highest_cps = self.cps
-            self.most_efficient_delay = self.fast_delay
-        self.tweak_delay()
-
-    def idle_info(self):
-        os.system('cls')
-        print(f'Total time:\t{int(time.time()-self.start)}s')
-        print(f'Total clicks:\t{self.nb_clicks} clicks')
-        print(f'Next click in:\t{int(math.ceil(self.idle_delay - (time.time() - self.last_click)))}s')
-
-    def fast_info(self):
-        os.system('cls')
-        print(f'\rTotal time:\t{int(time.time()-self.start)}s')
-        print(f'\rTotal clicks:\t{self.nb_clicks} clicks')
-        print(f'\rCPS:\t\t{int(self.cps)}cps')
-        print(f'\rCPS_t:\t\t{int(self.cps_theo)}cps')
-        print(f'avg cps:\t{int(self.nb_clicks/(time.time()-self.start))}cps')
-        print(f'\nhighest cps:{int(self.highest_cps)}s')
-
-        print(f'\rDelay:\t\t{round(self.fast_delay*1000,5)}ms')
-        print(f'\nmost efficient delay:{round(self.most_efficient_delay*1000,5)}s')
-
 
 # =-=-=-=-= CALLBACKS =-=-=-=-=
 
     def on_move(self, x, y):
         self.x = x
         self.y = y 
-        if self.stop_on_move and (x,y) not in self.targets:
+        if self.stop_on_move and (x,y) not in [(tar.x, tar.y) for tar in self.queue.targets]:
             self.active = False
             self.listener.stop()
-        
+
     def on_scroll(self, x, y, dx, dy):
         self.active = False
         self.listener.stop()
@@ -244,12 +133,30 @@ class clicker():
         with Listener(on_move=self.on_move, on_click=self.on_click, on_scroll=self.on_scroll) as self.listener:
             self.listener.join()
 
-    def run(self):
-        mode = input('1: idle\n2: fast\n3: Target\n4: Targets + Fast\n')
-        os.system('cls')
+    def run_queue(self):
+        task=None
+        t = Thread(target=self.click_listener)
+        t.start()
+        while self.active:
+            print('Checking task...')
+            task = self.queue.get_if_any()
+            if task is None:
+                if self.queue.has_fast_target():
+                    print('Defaulting to fast target')
+                    self.queue.fast_target.handle()
+                    time.sleep(2)
+            else:
+                print(f'Handling {type(task)}')
+                task.handle()
 
-        cmd = ""
-        while cmd != 'n':
+        print('No longer active')
+        self.queue.stop()
+        t.join()
+
+    def run(self):
+        while self.active and not self.stopped:
+            mode = input('1: idle\n2: fast\n3: Target\n4: Targets + Fast\n')
+            os.system('cls')
             if mode == '1': # IDLE
                 
                 self.countdown(2)
@@ -257,6 +164,7 @@ class clicker():
 
                 t = Thread(target=self.click_listener)
                 t.start()
+                
                 rt1 = RepeatedTimer(1, self.idle_info)
                 rt2 = RepeatedTimer(self.idle_delay, self.idle_presence)
 
@@ -315,11 +223,13 @@ class clicker():
                 self.fast_click()
 
                 t.join()
-            os.system('cls')
-            cmd = input('Resume? (y/n)')
+
 # =-=-=-=-= MAIN =-=-=-=-=
 
-if __name__ == '__main__':
-    c = clicker()
+# if __name__ == '__main__':
+#     sg.Window(title="Hello World", layout=[[]], margins=(100, 50)).read()
     
-    c.run()
+#     c = clicker()
+#     c.add_target2Queue(FastTarget(1000, 1000, info_freq=0))
+#     c.add_target2Queue(TrackerTarget(1000, 1000, 5, detectionMode.change))
+#     c.run_queue()
