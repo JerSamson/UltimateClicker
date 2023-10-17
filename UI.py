@@ -1,10 +1,14 @@
-from threading import Thread
+import base64
+import io
+from threading import Thread, Timer
 import PySimpleGUI as sg
 from DetectionMode import detectionMode
 from pynput.mouse import Listener
 import getpixelcolor
 from ClickQueue import ClickQueue
 from Target import *
+import pyscreenshot as ImageGrab
+from PIL import ImageTk, Image
 
 SET_TARGET_BTN      = '-SET TARGETS-'
 MODE_SAME_BTN       = '-SAME-'
@@ -13,13 +17,16 @@ MODE_CHANGE_BTN     = '-CHANGE-'
 COLOR_BTN           = '-COLOT-'
 CLICK_BTN           ='-CLICK-'
 FAST_TRACK_BTN      ='-FASTTRACK-'
-
+CUR_IMAGE_KEY       ='-CURIMAGE-'
+OG_IMAGE_KEY        ='-OGIMAGE-'
 TARGET_TABLE        = '-TARGETS-'
-
+DETAIL_ID           = '-DETAILID-'
 ENABLED_COLOR       = ('black', 'green')
 DISABLED_COLOR      = ('black', 'red')
 
 COLOR_PREVIEW_SIZE  = (10,2)
+
+#TODO: Priority Queue
 
 def rgb_to_hex(r, g, b):
     return '#{:02x}{:02x}{:02x}'.format(r, g, b)
@@ -35,6 +42,8 @@ class App:
         self.setting_targets = False
         self.targets = []
         self.mode = detectionMode.undefined
+
+        self.selected_target = None
 
         self.aborted = False
         self.running = False
@@ -52,24 +61,30 @@ class App:
         # =========================== FAST TAB ===========================
         fast_tab=[[sg.Text('FAST',  size=(self.tab_size_x, self.tab_size_y))]]
 
+        # =========================== RIGHT CLICK MENU ===========================
+        self.right_click_menu = ['&Right', ['Delete', 'Details']]
+
+
+
         # =========================== TRACKER TAB ===========================
 
         toprow = ['id', 'type', 'pos']
         rows = []
 
         target_table = sg.Table(values=rows, headings=toprow,
-        auto_size_columns=True,
-        display_row_numbers=False,
-        justification='center', key=TARGET_TABLE,
-        selected_row_colors='red on yellow',
-        enable_events=True,
-        expand_x=True,
-        expand_y=True,
-        enable_click_events=True)
+            auto_size_columns=True,
+            display_row_numbers=False,
+            justification='center', key=TARGET_TABLE,
+            selected_row_colors='red on yellow',
+            right_click_menu=self.right_click_menu,
+            enable_events=True,
+            expand_x=True,
+            expand_y=True,
+            enable_click_events=True
+        )
 
-        track_tab=[
-            [sg.Text('TRACK' ,  size=(self.tab_size_x, self.tab_size_y))],
-            [sg.Button('Set Targets', key=SET_TARGET_BTN, button_color = DISABLED_COLOR),
+
+        selection_buttons = [sg.Button('Set Targets', key=SET_TARGET_BTN, button_color = DISABLED_COLOR),
             sg.VSeparator(),
             sg.Button('same', key=MODE_SAME_BTN, button_color = DISABLED_COLOR, visible=False),
             sg.Button('diff', key=MODE_DIFF_BTN, button_color = DISABLED_COLOR, visible=False),
@@ -77,8 +92,33 @@ class App:
             sg.Button('fastClick', key=FAST_TRACK_BTN, button_color = DISABLED_COLOR, visible=False),
             sg.VSeparator(),
             sg.Button('', key=COLOR_BTN, size=COLOR_PREVIEW_SIZE ,button_color = DISABLED_COLOR, visible=False),
-            ],
+            ]
+        
+        self.graph_cur = sg.Graph(canvas_size=(IMAGE_SIZE_X*2, IMAGE_SIZE_Y*2),
+                graph_bottom_left=(-IMAGE_SIZE_X, -IMAGE_SIZE_Y),
+                graph_top_right=(IMAGE_SIZE_X, IMAGE_SIZE_Y),
+                enable_events=True,
+                drag_submits=False, key=CUR_IMAGE_KEY)
+        self.graph_og = sg.Graph(canvas_size=(IMAGE_SIZE_X*2, IMAGE_SIZE_Y*2),
+                graph_bottom_left=(-IMAGE_SIZE_X, -IMAGE_SIZE_Y),
+                graph_top_right=(IMAGE_SIZE_X, IMAGE_SIZE_Y),
+                enable_events=True,
+                drag_submits=False, key=OG_IMAGE_KEY)
+        
+        cur_frame = [self.graph_cur]
+        og_frame = [self.graph_og]
+
+        details=[
+            sg.Frame('Current', [cur_frame]),
+            sg.Frame('Original', [og_frame]),
+            sg.Text(key=DETAIL_ID)
+            ]
+
+        track_tab=[
+            [sg.Sizer(600,0)],
+            selection_buttons,
             [target_table],
+            details,
             [sg.Button('CLICK!', key=CLICK_BTN, visible=False)]
         ]
 
@@ -86,8 +126,8 @@ class App:
         # =========================== MAIN LAYOUT ===========================
         layout = [
             [sg.TabGroup([[
-                sg.Tab('idle', idle_tab),
-                sg.Tab('fast', fast_tab),
+                # sg.Tab('idle', idle_tab),
+                # sg.Tab('fast', fast_tab),
                 sg.Tab('Track', track_tab)
             ]])],
         [sg.OK(), sg.Cancel()]
@@ -95,6 +135,35 @@ class App:
 
         # Create the window
         self.window = sg.Window("UltimateClicker", layout, location=(500,500))
+
+    def display_current(self):
+        cur = self.selected_target
+        while cur == self.selected_target:
+            self.draw_current()
+            time.sleep(0.1)
+
+    def draw_current(self):
+        try:
+            im=ImageGrab.grab(
+            bbox=(
+                self.selected_target.x - IMAGE_SIZE_X,
+                self.selected_target.y - IMAGE_SIZE_Y,
+                self.selected_target.x + IMAGE_SIZE_X,
+                self.selected_target.y + IMAGE_SIZE_Y))
+
+            buffer = io.BytesIO()
+            im.save(buffer, format='PNG')
+            im.close()
+            b64_str = base64.b64encode(buffer.getvalue())
+            self.graph_cur.draw_image(data=b64_str, location=(-IMAGE_SIZE_X, IMAGE_SIZE_Y))
+            self.graph_cur.draw_circle((0,0), self.selected_target.zone_area, line_color='red', line_width=2)
+        except:
+            pass
+        
+    def draw_og(self):
+        self.graph_og.draw_image(data=self.selected_target.ref_area, location=(-IMAGE_SIZE_X, IMAGE_SIZE_Y))
+        self.graph_og.draw_circle((0,0), self.selected_target.zone_area, line_color='red', line_width=2)
+
 
     def nb_target_ready(self):
         i=0
@@ -107,6 +176,9 @@ class App:
             if not tar.is_ready():
                 return False
         return True
+
+    # def set_table_rcm(self, rcm):
+    #     self.window[TARGET_TABLE].update(right_click_menu=rcm)
 
     def update_buttons(self):
         self.window[MODE_SAME_BTN].update(button_color = ENABLED_COLOR if self.mode == detectionMode.same else DISABLED_COLOR)
@@ -155,6 +227,7 @@ class App:
                 self.window[COLOR_BTN].update(button_color = 'red', text='error')
         elif self.running and (x,y) not in [(tar.x, tar.y) for tar in self.targets]:
             self.aborted = True
+            self.window.bring_to_front()
 
     def on_scroll(self, x, y, dx, dy):
         pass
@@ -168,10 +241,13 @@ class App:
             elif self.mode == detectionMode.different:
                 tar = TrackerTarget(x, y, 5, detectionMode.different)
             elif self.mode == detectionMode.change:
-                tar = TrackerTarget(x, y, 5, detectionMode.different)
+                tar = TrackerTarget(x, y, 5, detectionMode.change)
             elif self.mode == detectionMode.fast:
                 tar = FastTarget(x, y, 1)
+            else:
+                return
             self.add_target(tar)
+            Timer(0.1, self.window.bring_to_front).start()
 
     def set_mode(self, m):
         self.mode = m
@@ -193,15 +269,11 @@ class App:
 
         self.queue.start()
         while not self.aborted:
-            print('Checking task...')
             task = self.queue.get_if_any()
             if task is None:
                 if self.queue.has_fast_target():
-                    print('Defaulting to fast target')
                     self.queue.fast_target.handle()
-                    # time.sleep(2)
             else:
-                print(f'Handling {type(task)}')
                 task.handle()
 
         self.running = False
@@ -214,8 +286,6 @@ class App:
         self.queue.add_target(tar)
         self.update_target_table()
         Thread(target=self.track_ready, daemon=True).start()
-
-        # self.window[TARGET_TABLE].update(values=self.targets)
 
     def remove_target(self, tar):
         self.targets.remove(tar)
@@ -250,10 +320,24 @@ class App:
                 self.set_mode(detectionMode.fast)
             elif event == CLICK_BTN:
                 Thread(target=self.run_queue, daemon=True).start()
-
             elif '+CLICKED+' in event:
-                self.remove_target(self.targets[event[2][0]])
-
+                try:
+                    self.selected_target = self.targets[event[2][0]]
+                except:
+                    pass #No Target selected
+            elif event == 'Delete':
+                if self.selected_target is not None:
+                    self.remove_target(self.selected_target)
+                    self.selected_target=None
+                    self.graph_cur.Erase()
+                    self.graph_og.Erase()
+                    self.window[DETAIL_ID].update(value='')
+            elif event == 'Details':
+                if self.selected_target is not None:
+                    self.window[DETAIL_ID].update(value=f'Target ID: {str(self.selected_target.targetid)}')
+                    self.draw_og()
+                    Thread(target=self.display_current, daemon=True).start()
+                    # self.window[IMAGE_KEY].update(source=b64_str)
         self.listener.stop()
         self.click_listener_thread.join()
         self.window.close()

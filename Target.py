@@ -1,3 +1,5 @@
+import base64
+import io
 import os
 import time
 import math
@@ -5,9 +7,13 @@ from enum import Enum
 from threading import Thread
 import getpixelcolor
 import win32api, win32con
+import pyscreenshot as ImageGrab
 
 from DetectionMode import detectionMode
 from RepeatedTimer import RepeatedTimer
+
+IMAGE_SIZE_X = 150
+IMAGE_SIZE_Y = 50
 
 class BaseTarget(object):
     def __init__(self, x, y, info_freq=0, active=False):
@@ -70,7 +76,6 @@ class IdleTarget(BaseTarget):
 
     def handle(self):
         if self.active and not self.handled:
-            print('IdleTarget handle method called')
             self.handled=True
             self.click()
     
@@ -113,7 +118,6 @@ class FastTarget(BaseTarget):
 
     def handle(self):
         if self.active:
-            print('FastTarget handle method called')
             self.click()
             time.sleep(self.delay)
     
@@ -137,12 +141,14 @@ class FastTarget(BaseTarget):
             self.most_efficient_delay = self.fast_delay
         self.tweak_delay()
 
+
 class TrackerTarget(BaseTarget):
     def __init__(self, x, y, zone_area, mode, mindist = 300, info_freq=False, active=True):
         BaseTarget.__init__(self, x, y, info_freq, active)
         self.zone_area = zone_area
         self.mode = mode
         
+        self.ref_area = None
         self.waiting_acquisition = False
         self.acquisition_min_dist = mindist
         self.acquired = False
@@ -161,6 +167,14 @@ class TrackerTarget(BaseTarget):
         while (abs(self.x-x) <= self.acquisition_min_dist and abs(self.y-y) <= self.acquisition_min_dist):
             time.sleep(0.2)
             x,y = win32api.GetCursorPos()
+
+        # Get ref area
+        im=ImageGrab.grab(bbox=(self.x - IMAGE_SIZE_X, self.y - IMAGE_SIZE_Y, self.x + IMAGE_SIZE_X, self.y + IMAGE_SIZE_Y))
+        buffer = io.BytesIO()
+        im.save(buffer, format='PNG')
+        im.close()
+        self.ref_area = base64.b64encode(buffer.getvalue())
+
         self.color = self.get_color()
         self.acquired = True        
         self.waiting_acquisition = False
@@ -194,7 +208,6 @@ class TrackerTarget(BaseTarget):
 
     def handle(self):
         if self.active and not self.handled:
-            print('TrackerTarget handle method called')
             self.click()
             if self.mode == detectionMode.change:
                 self.bg_color_acquisition()

@@ -31,7 +31,8 @@ class ClickQueue:
                 self.fast_target = tar
                 return
             else:
-                raise Exception('Only one fast target allowed')
+                print('Only one fast target allowed')
+                # raise Exception('Only one fast target allowed')
         
         tar.targetid = self.id_cnt
         self.id_cnt+=1
