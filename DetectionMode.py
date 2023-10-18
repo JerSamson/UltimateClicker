@@ -1,6 +1,6 @@
-from enum import Enum
+from enum import IntEnum
 
-class detectionMode(Enum):
+class detectionMode(IntEnum):
     different = 1
     same      = 2
     change    = 3
