@@ -98,7 +98,7 @@ class clicker():
 
         self.wait_for_targets_ready()
         self.setting_targets = False
-        t = Thread(target=self.detect_color_change, daemon=True)
+        t = Thread(target=self.detect_color_change, daemon=True, name='DetectColorChange')
 
         t.start()
 
@@ -122,7 +122,7 @@ class clicker():
                 print("I assume this click was the terminal...")
                 return
             self.nb_targets+=1
-            Thread(target=self.wait_for_color_acquisition, args=(x, y)).start()
+            Thread(target=self.wait_for_color_acquisition, args=(x, y), name='WaitColorAcquisition').start()
         elif pressed:
             self.nb_clicks+=1
 
@@ -135,7 +135,7 @@ class clicker():
 
     def run_queue(self):
         task=None
-        t = Thread(target=self.click_listener)
+        t = Thread(target=self.click_listener, name='ClickListener')
         t.start()
         while self.active:
             print('Checking task...')

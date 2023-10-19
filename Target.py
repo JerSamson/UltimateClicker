@@ -8,6 +8,7 @@ from threading import Thread
 import getpixelcolor
 import win32api, win32con
 import pyscreenshot as ImageGrab
+import pyautogui
 
 from DetectionMode import detectionMode
 from RepeatedTimer import RepeatedTimer
@@ -15,25 +16,23 @@ from RepeatedTimer import RepeatedTimer
 IMAGE_SIZE_X = 150
 IMAGE_SIZE_Y = 50
 
-
-
-
 class BaseTarget(object):
     def __init__(self, x, y, info_freq=0, active=False):
         self.x = x
         self.y = y
         self.info_freq = info_freq
+        self.infoTask=None
         self.active=active
         self.triggered=False
-        self.handled=True
+        self.handled=False
         self.targetid=-1
         self.enable = True
         self.times_clicked=0
         self.ref_area = None
         self.type_priority = {
             TrackerTarget :  100,
-            IdleTarget    :  300,
-            FastTarget    :  500
+            IdleTarget    :  1000,
+            FastTarget    :  5000
         }
         self.priority_mode = 'lowest_first'
         self.priority = 0
@@ -63,6 +62,7 @@ class BaseTarget(object):
 
     def start(self):
         self.active=True
+        self.handled=False
         if self.info_freq > 0:
             self.infoTask = RepeatedTimer(self.info_freq, self.info)
         else: self.infoTask = None
@@ -107,13 +107,19 @@ class IdleTarget(BaseTarget):
 
     def get_ref_area(self):
         try:
-            im=ImageGrab.grab(bbox=(self.x - IMAGE_SIZE_X, self.y - IMAGE_SIZE_Y, self.x + IMAGE_SIZE_X, self.y + IMAGE_SIZE_Y))
+            res = pyautogui.size()
+            x1 = self.x - IMAGE_SIZE_X if self.x > IMAGE_SIZE_X else 0
+            x2 = self.x + IMAGE_SIZE_X if self.x + IMAGE_SIZE_X < res[0] else res[0]
+            y1 = self.y - IMAGE_SIZE_Y if self.y > IMAGE_SIZE_Y else 0
+            y2 = self.y + IMAGE_SIZE_Y if self.y + IMAGE_SIZE_Y < res[1] else res[1]
+
+            im=ImageGrab.grab(bbox=(x1, y1, x2, y2))
             buffer = io.BytesIO()
             im.save(buffer, format='PNG')
             im.close()
             self.ref_area = base64.b64encode(buffer.getvalue())
         except Exception as e:
-            print(e)
+            print(f'ERROR - IDLE - get_ref_area ({e})')
             self.ref_area = None
             pass # Minor repercussions
 
@@ -122,9 +128,13 @@ class IdleTarget(BaseTarget):
 
     def handle(self):
         if self.active and not self.handled:
-            self.handled=True
             self.click()
             self.times_clicked+=1
+            self.handled=True
+            return True
+        else:
+            self.handled=False
+            return False
     
 class FastTarget(BaseTarget):
     def __init__(self, x, y, info_freq=0, active=False):
@@ -167,16 +177,27 @@ class FastTarget(BaseTarget):
 
     def get_ref_area(self):
         try:
-            im=ImageGrab.grab(bbox=(self.x - IMAGE_SIZE_X, self.y - IMAGE_SIZE_Y, self.x + IMAGE_SIZE_X, self.y + IMAGE_SIZE_Y))
+            res = pyautogui.size()
+            x1 = self.x - IMAGE_SIZE_X if self.x > IMAGE_SIZE_X else 0
+            x2 = self.x + IMAGE_SIZE_X if self.x + IMAGE_SIZE_X < res[0] else res[0]
+            y1 = self.y - IMAGE_SIZE_Y if self.y > IMAGE_SIZE_Y else 0
+            y2 = self.y + IMAGE_SIZE_Y if self.y + IMAGE_SIZE_Y < res[1] else res[1]
+
+            im=ImageGrab.grab(bbox=(x1, y1, x2, y2))
             buffer = io.BytesIO()
             im.save(buffer, format='PNG')
             im.close()
             self.ref_area = base64.b64encode(buffer.getvalue())
+            
         except Exception as e:
-            print(e)
+            print(f'ERROR - FAST - get_ref_area ({e})')
             self.ref_area = None
             pass # Minor repercussions
-
+    
+    def stop(self):
+        self.cps = 0
+        return super().stop()
+    
     def info(self):
         if self.active and self.enable:
             os.system('cls')
@@ -197,10 +218,13 @@ class FastTarget(BaseTarget):
         if self.active:
             self.click()
             self.times_clicked+=1
-            time.sleep(self.delay)
+            # time.sleep(self.delay)
             if time.time() - self.last_cps_time > self.cps_compute_freq:
                 self.update_cps()
             # self.tweak_delay()
+            return True
+        else:
+            return False
 
     def tweak_delay(self):
         if (self.cps_theo - self.cps) <= 5:
@@ -212,15 +236,16 @@ class FastTarget(BaseTarget):
         if self.first_click_time == 0:
             return
         
-        self.cps = (self.nb_clicks - self.last_nb_clicks)/(time.time() - self.last_cps_time)
-        self.cps_theo = (self.nb_clicks_theo - self.last_nb_clicks_theo)/(time.time() - self.last_cps_time)
-        self.last_cps_time = time.time()
+        now = time.time()
+        self.cps = (self.nb_clicks - self.last_nb_clicks)/(now - self.last_cps_time)
+        self.cps_theo = (self.nb_clicks_theo - self.last_nb_clicks_theo)/(now - self.last_cps_time)
+        self.last_cps_time = now
         self.last_nb_clicks= self.nb_clicks
         self.last_nb_clicks_theo = self.nb_clicks_theo
         if self.cps > self.highest_cps:
             self.highest_cps = self.cps
             self.most_efficient_delay = self.delay
-        self.tweak_delay()
+        # self.tweak_delay()
 
 
 class TrackerTarget(BaseTarget):
@@ -243,9 +268,10 @@ class TrackerTarget(BaseTarget):
         p = self.type_priority[TrackerTarget]
         if self.priority_mode == 'lowest_first':
             if self.mode in [detectionMode.different, detectionMode.same]: 
-                p -= self.y // 71
+                p -= self.y // 47
+                p *= 3
             elif self.mode == detectionMode.change:
-                p += self.x // 71
+                p += self.x // 47 - self.type_priority[TrackerTarget]
         self.priority = p
         return p
 
@@ -254,13 +280,20 @@ class TrackerTarget(BaseTarget):
     
     def get_ref_area(self):
         try:
-            im=ImageGrab.grab(bbox=(self.x - IMAGE_SIZE_X, self.y - IMAGE_SIZE_Y, self.x + IMAGE_SIZE_X, self.y + IMAGE_SIZE_Y))
+            res = pyautogui.size()
+            x1 = self.x - IMAGE_SIZE_X if self.x > IMAGE_SIZE_X else 0
+            x2 = self.x + IMAGE_SIZE_X if self.x + IMAGE_SIZE_X < res[0] else res[0]
+            y1 = self.y - IMAGE_SIZE_Y if self.y > IMAGE_SIZE_Y else 0
+            y2 = self.y + IMAGE_SIZE_Y if self.y + IMAGE_SIZE_Y < res[1] else res[1]
+
+            im=ImageGrab.grab(bbox=(x1, y1, x2, y2))
+
             buffer = io.BytesIO()
             im.save(buffer, format='PNG')
             im.close()
             self.ref_area = base64.b64encode(buffer.getvalue())
         except Exception as e:
-            print(e)
+            print(f'ERROR - TRACKER - get_ref_area ({e})')
             self.ref_area = None
             pass # Minor repercussions
 
@@ -290,16 +323,26 @@ class TrackerTarget(BaseTarget):
             self.triggered = False
             return False
         
-        self.triggered = False
+        old_value = self.triggered
+        cur_color = self.get_color()
 
         if self.mode == detectionMode.same:
-            self.triggered = self.color == self.get_color()
+            self.triggered = self.color == cur_color
         elif self.mode in [detectionMode.different, detectionMode.change]:
-            self.triggered = self.color != self.get_color()
+            self.triggered = self.color != cur_color
         else:
             raise Exception('Unsupported trigger mode')
         
-        # self.handled = self.handled and not self.triggered 
+        if (not old_value and self.triggered): # Has become triggered
+            self.handled = False
+            # print(f'Target {self.targetid} triggered.\n\tcur:{cur_color} og:{self.color}')
+            
+        elif not self.triggered:
+            self.handled = True
+
+        if self.triggered:
+            # print(f'Target {self.targetid} is triggered. cur:{cur_color} og:{self.color}')
+            pass
 
         return self.triggered        
     
@@ -309,10 +352,16 @@ class TrackerTarget(BaseTarget):
 
 
     def handle(self):
-        if self.active:
+        if self.active and self.enable and not self.handled:
             self.click()
             self.times_clicked+=1
             if self.mode == detectionMode.change:
                 self.bg_color_acquisition()
+            print(f'Handled Target {self.targetid}')
             self.handled=True
+            self.triggered = False
+            self.check_trigger()
+            return True
+        else:
+            return False
 
