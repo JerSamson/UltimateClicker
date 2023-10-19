@@ -20,7 +20,7 @@ import ctypes
 class SelfDestructException(Exception):
     pass
 
-class ClickQueue:
+class ClickHandler:
     def __init__(self) -> None:
         self.click_queue = PriorityQueue()
         self.targets = []
@@ -53,7 +53,7 @@ class ClickQueue:
                 for j in range(self.wait_resolution):
                     time.sleep(1/self.wait_resolution)
                     if not self.running:
-                        print('INFO - Aborted wait because clickqueue is not running anymore')
+                        print('INFO - Aborted wait because ClickHandler is not running anymore')
                         return
 
     def increment_patience(self, inc):
@@ -270,7 +270,7 @@ class ClickQueue:
                         else:
                             self.has_update = True
             except Exception as e:
-                print(f'ERROR - ClickQueue - Update thread failed ({e})')
+                print(f'ERROR - ClickHandler - Update thread failed ({e})')
             finally:
                 self.queue_lock.release()
 
@@ -314,7 +314,7 @@ class ClickQueue:
         while self.running:
             self.handle_task(self.fast_target)
             if not self.running: break
-        print('INFO - ClickQueue.fast_click_thread() thread finished')
+        print('INFO - ClickHandler.fast_click_thread() thread finished')
 
     # def self_destruct(self):
     #     if not self.running and self.main_thread.is_alive():
@@ -390,4 +390,4 @@ class ClickQueue:
             # self.self_destruct_thread.stop()
             if self.has_fast_target():
                 self.fast_thread.join(timeout=10)
-            print('INFO - ClickQueue.Run() thread finished')
+            print('INFO - ClickHandler.Run() thread finished')

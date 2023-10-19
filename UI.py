@@ -5,7 +5,7 @@ import PySimpleGUI as sg
 from DetectionMode import detectionMode
 from pynput.mouse import Listener
 import getpixelcolor
-from ClickQueue import ClickQueue
+from ClickHandler import ClickHandler
 from Target import *
 import pyscreenshot as ImageGrab
 from PIL import ImageTk, Image
@@ -72,7 +72,7 @@ class App:
         self.last_selected = None
         self.aborted = False
         self.running = False
-        self.queue = ClickQueue()
+        self.queue = ClickHandler()
         
         self.tab_size_x = 50
         self.tab_size_y = 1
