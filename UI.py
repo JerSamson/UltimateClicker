@@ -25,9 +25,9 @@ OG_IMAGE_KEY        ='-OGIMAGE-'
 LAST_IMAGE_KEY      ='-LASTIMAGE-'
 NEXT_IMAGE_KEY      ='-NEXTIMAGE-'
 TARGET_VSEP         ='-TARVSEP-'
-SELECTED_FRAME      ='-SELECTEDFRAME-'
-NEXT_FRAME      ='-NEXTTARFRAME-'
-LAST_FRAME      ='-LASTTARFRAME-'
+SELECTED_FRAME      ='-SELTARFRAME-'
+NEXT_FRAME          ='-NEXTTARFRAME-'
+LAST_FRAME          ='-LASTTARFRAME-'
 TARGET_TABLE        = '-TARGETS-'
 DETAIL_ID           = '-DETAILID-'
 TIMES_CLICKED       = '-NBCLICKS-'
@@ -54,7 +54,7 @@ def text_color_for_bg(r,g,b):
 class App:
 
     def __init__(self) -> None:
-        
+
         self.click_listener_thread = None
         # self.track_ready_thread = Thread(target=self.track_ready, name='TrackReady')
         # self.track_ready_thread_started = False
@@ -64,7 +64,7 @@ class App:
         self.mode = detectionMode.fast
 
         self.saves_directory = 'SavedTargets\\'
-        self.zone_size = 10 
+        self.zone_size = 10
         self.track_target_lock = Lock()
         self.selected_target = None
         self.last_target_drew = None
@@ -73,7 +73,7 @@ class App:
         self.aborted = False
         self.running = False
         self.queue = ClickHandler()
-        
+
         self.tab_size_x = 50
         self.tab_size_y = 1
 
@@ -126,47 +126,45 @@ class App:
             # sg.VSeparator(),
             # sg.Button('', key=COLOR_BTN, size=COLOR_PREVIEW_SIZE ,button_color = DISABLED_COLOR, visible=False),
             ]
-        
-        self.graph_cur = sg.Graph(canvas_size=(IMAGE_SIZE_X*2, IMAGE_SIZE_Y*2),
-                graph_bottom_left=(-IMAGE_SIZE_X, -IMAGE_SIZE_Y),
-                graph_top_right=(IMAGE_SIZE_X, IMAGE_SIZE_Y),
-                enable_events=True,
-                drag_submits=False, key=CUR_IMAGE_KEY)
+
+
         self.graph_selected = sg.Graph(canvas_size=(IMAGE_SIZE_X*2, IMAGE_SIZE_Y*2),
                 graph_bottom_left=(-IMAGE_SIZE_X, -IMAGE_SIZE_Y),
                 graph_top_right=(IMAGE_SIZE_X, IMAGE_SIZE_Y),
                 enable_events=True,
-                drag_submits=False, key=OG_IMAGE_KEY)
-        detail_txt = sg.Text(key=DETAIL_ID),
-        
-        cur_frame = [self.graph_cur]
-        selected_frame = [self.graph_selected]
-        
+                drag_submits=False, key=OG_IMAGE_KEY,
+                expand_x=True, expand_y=True)
+        detail_txt = sg.Text(key=DETAIL_ID)
+
+        selected_frame = [self.graph_selected, detail_txt]
+
         self.graph_last = sg.Graph(canvas_size=(IMAGE_SIZE_X*2, IMAGE_SIZE_Y*2),
                 graph_bottom_left=(-IMAGE_SIZE_X, -IMAGE_SIZE_Y),
                 graph_top_right=(IMAGE_SIZE_X, IMAGE_SIZE_Y),
                 enable_events=True,
-                drag_submits=False, key=LAST_IMAGE_KEY)
-        
+                drag_submits=False, key=LAST_IMAGE_KEY,
+                expand_x=True, expand_y=True)
+
         self.graph_next = sg.Graph(canvas_size=(IMAGE_SIZE_X*2, IMAGE_SIZE_Y*2),
                 graph_bottom_left=(-IMAGE_SIZE_X, -IMAGE_SIZE_Y),
                 graph_top_right=(IMAGE_SIZE_X, IMAGE_SIZE_Y),
                 enable_events=True,
-                drag_submits=False, key=NEXT_IMAGE_KEY)
+                drag_submits=False, key=NEXT_IMAGE_KEY,
+                expand_x=True, expand_y=True)
 
         last_frame = [self.graph_last]
         next_frame = [self.graph_next]
 
         details=[
-            sg.Frame('Next', [next_frame], visible=False, key=NEXT_FRAME),
-            sg.Frame('Last', [last_frame], visible=False, key=LAST_FRAME),
-            # sg.Frame('Current', [cur_frame]),
-
+            sg.Sizer(0, 0),
+            sg.Frame('Next', [next_frame], visible=False, key=NEXT_FRAME, expand_x=True),
+            sg.Frame('Last', [last_frame], visible=False, key=LAST_FRAME, expand_x=True),
+            sg.Frame('Selected', [selected_frame], visible=False, key=SELECTED_FRAME, expand_x=True),
             ]
 
-        selected=[
-            sg.Frame('Selected ref', [selected_frame, detail_txt], visible=False, key=SELECTED_FRAME)
-        ]
+        # selected=[
+        #     sg.Frame('Selected ref', [selected_frame, detail_txt], visible=False, key=SELECTED_FRAME)
+        # ]
 
         track_tab=[
             [sg.Sizer(700,0)],
@@ -179,7 +177,6 @@ class App:
             [sg.Text(key=NEXT_TARGET, visible=False)],
             [target_table],
             details,
-            selected
         ]
 
 
@@ -230,48 +227,25 @@ class App:
 
             for row in csvreader:
                 tar = None
-                typ = row[0] 
+                typ = row[0]
                 if typ == 'Tracker':
                     tar = TrackerTarget(int(row[1]), int(row[2]), self.zone_size, detectionMode(int(row[3])))
                 elif typ == 'Fast':
                     tar = FastTarget(int(row[1]), int(row[2]))
                 elif typ == 'Idle':
-                    tar = IdleTarget(int(row[1]), int(row[2]))    
+                    tar = IdleTarget(int(row[1]), int(row[2]))
                 if tar is not None:
                     self.add_target(tar, False)
             # self.track_ready_thread.join()
     def save_targets(self, save_file):
         if len(self.targets) == 0:
             return
-        
+
         file_path = self.saves_directory + save_file
         with open(file_path, 'w', newline='') as file:
             writer = csv.writer(file)
             for tar in self.targets:
                 writer.writerow(tar.to_csv())
-
-    def draw_current(self):
-        try:
-            im=ImageGrab.grab(
-            bbox=(
-                self.selected_target.x - IMAGE_SIZE_X,
-                self.selected_target.y - IMAGE_SIZE_Y,
-                self.selected_target.x + IMAGE_SIZE_X,
-                self.selected_target.y + IMAGE_SIZE_Y))
-
-            buffer = io.BytesIO()
-            im.save(buffer, format='PNG')
-            im.close()
-            b64_str = base64.b64encode(buffer.getvalue())
-            self.graph_cur.draw_image(data=b64_str, location=(-IMAGE_SIZE_X, IMAGE_SIZE_Y))
-            if isinstance(self.selected_target, TrackerTarget):
-                self.graph_cur.draw_circle((0,0), self.selected_target.zone_area//2, line_color='red', line_width=3)
-            else:
-                self.graph_cur.draw_line((-10,0), (10,0), color='red', width=3)
-                self.graph_cur.draw_line((0,-10), (0,10), color='red', width=3)
-        except Exception as e:
-            print(e)
-            pass
 
     def draw(self, tar=None, graph = None):
         graph.draw_image(data=tar.ref_area, location=(-IMAGE_SIZE_X, IMAGE_SIZE_Y))
@@ -333,7 +307,7 @@ class App:
             self.window[MODE_CHANGE_BTN].update(visible=self.setting_targets)
             self.window[FAST_TRACK_BTN].update(visible=self.setting_targets)
             # self.window[COLOR_BTN].update(visible=self.setting_targets and self.mode in [detectionMode.same, detectionMode.different, detectionMode.change])
-            
+
             self.window[PATIENCE_SLIDER].update(visible=not self.running)
             self.window[PATIENCE_PROGRESS].update(visible=self.running)
             self.window[PATIENCE_PROGRESS_2].update(visible=self.running)
@@ -355,19 +329,19 @@ class App:
         right = right.replace('+','')
         right = right.replace('0','')
         return f'{left}E{right}'
-     
+
     def update_graphs(self):
         self.window[SELECTED_FRAME].update(visible=self.selected_target is not None and not self.running)
-        self.window[LAST_FRAME].update(visible=self.running)
         self.window[NEXT_FRAME].update(visible=self.running)
-        
+        self.window[LAST_FRAME].update(visible=self.running)
+
         if self.queue.last_click is None:
             self.graph_last.erase()
         elif (self.last_target_drew is None or self.last_target_drew.targetid != self.queue.last_click):
             self.draw_last()
 
         if self.queue.next_target is None:
-            self.graph_next.erase() 
+            self.graph_next.erase()
         elif (self.next_target_drew is None or self.next_target_drew[1].targetid != self.queue.next_target):
             self.draw_next()
 
@@ -509,7 +483,7 @@ class App:
         self.queue.stop()
 
         self.running = False
-        
+
         self.update_graphs()
         self.update_buttons()
         print('INFO - UI.run_queue() thread finished')
@@ -535,14 +509,14 @@ class App:
             self.click_listener_thread.start()
 
             while True:
-                timeout = 100 if not self.running else 500
+                timeout = 100 if not self.running else 1000
                 event, values = self.window.read(timeout=timeout, timeout_key='NA')
 
                 # End program if user closes window or
                 # presses the OK button
                 if event in [sg.WIN_CLOSED, 'CLOSE', 'OK']:
                     break
-                
+
                 if self.queue.has_update:
                     self.queue.has_update = False
                     self.targets = self.queue.targets
@@ -576,6 +550,7 @@ class App:
                     self.load_targets('testSave')
                 elif event == CLEAR_BTN:
                     self.queue.clear_targets()
+                    self.selected_target = None
                 elif event == CLICK_BTN:
                     if not self.all_targets_ready:
                         print('Not all targets ready. Cant run.')
@@ -587,7 +562,8 @@ class App:
                         t = [tar for tar in self.targets if tar.targetid == int(values[TARGET_TABLE][0])]
                         self.selected_target = None if len(t) <= 0 else t[0]
                         if self.selected_target is not None:
-                            self.window[DETAIL_ID].update(value=f'Target ID: {str(self.selected_target.targetid)}')
+                            self.window[DETAIL_ID].update(
+                                value=f'Target ID: {str(self.selected_target.targetid)}')
                         self.draw_selected()
                     except Exception as e:
                         pass #No Target selected
@@ -600,11 +576,11 @@ class App:
                         self.window[DETAIL_ID].update(value='')
                 elif event == 'Toggle':
                     if self.selected_target is not None:
-                        self.selected_target.enable = not self.selected_target.enable 
+                        self.selected_target.enable = not self.selected_target.enable
                 elif event == TOGGLE_TRACK:
                     for t in [tar for tar in self.targets if isinstance(tar, TrackerTarget)]:
                         t.enable = not t.enable
-                    
+
             self.listener.stop()
             self.click_listener_thread.join()
             self.window.close()

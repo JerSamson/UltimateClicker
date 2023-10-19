@@ -1,10 +1,9 @@
 from Target import *
-from queue import Queue, PriorityQueue
 from threading import Lock, Thread
 import time
 from RepeatedTimer import RepeatedTimer
 import ctypes
-
+from ClickQueue import ClickQueue
 # def ctype_async_raise(target_tid, exception):
 #     ret = ctypes.pythonapi.PyThreadState_SetAsyncExc(ctypes.c_long(target_tid), ctypes.py_object(exception))
 #     # ref: http://docs.python.org/c-api/init.html#PyThreadState_SetAsyncExc
@@ -22,15 +21,13 @@ class SelfDestructException(Exception):
 
 class ClickHandler:
     def __init__(self) -> None:
-        self.click_queue = PriorityQueue()
+        self.click_queue = ClickQueue()
         self.targets = []
-        self.event_queue = []
         self.fast_target = None
         self.running = False
         self.has_update = False
         self.handle_lock = Lock()
         self.add_wait_lock = Lock()
-        self.queue_lock = Lock()
         self.fast_thread = None
         self.main_thread = None
         self.trigger_thread = None
@@ -44,6 +41,7 @@ class ClickHandler:
         self.next_target = None
         self.last_click = None
         self.wait_resolution = 5
+        self.handling_one = False
 
     def wait(self, delay):
         if delay <= 1:
@@ -76,16 +74,17 @@ class ClickHandler:
     def has_fast_target(self):
         return self.fast_target is not None and self.fast_target.enable
  
-    def empty_queue(self):
-        while not self.click_queue.qsize() == 0:
-            self.get_from_queue()
+    # def empty_queue(self):
+    #     while not self.click_queue.qsize() == 0:
+    #         self.get_from_queue()
 
     def stop(self):
         self.running = False
+        self.handling_one = False
 
         for tar in self.targets:
             tar.stop()
-        self.empty_queue()
+        self.click_queue.empty_queue()
         
     def start(self):
         if self.running:
@@ -93,69 +92,29 @@ class ClickHandler:
         
         while self.main_thread is not None and self.main_thread.is_alive():
             time.sleep(1)
-            # e = SelfDestructException
-            # ctype_async_raise(self.main_thread.native_id, e)
             print('ClickerQueue Old thread still alive')
 
         
         self.running = True
+
         for tar in self.targets:
             tar.start()
+
         self.main_thread = Thread(target=self.run, name='ClickerQueueMain')
         self.main_thread.start()
 
     def add_target(self, tar):
-        # if isinstance(tar, FastTarget):
-        #     if self.fast_target is None:
-        #         self.fast_target = tar
-        #         self.has_update = True
-        #     else:
-        #         self.fast_target.enable = False
-        #         self.fast_target = tar
-        # raise Exception('Only one fast target allowed')
-        
         tar.targetid = self.id_cnt
         self.id_cnt+=1
         self.targets.append(tar)
         self.has_update = True
 
-    def is_in_queue(self, tar, own_lock = False):
-        if own_lock:
-             if not self.queue_lock.locked():
-                 return
-        else:
-            self.queue_lock.acquire()
-        try:
-           res = tar in self.event_queue
-        except:
-            res = False
-        finally:
-            if not own_lock:
-                self.queue_lock.release() 
-        
-        return res
+    def is_in_queue(self, tar):        
+        return self.click_queue.is_in_queue(tar)
 
-    def add_to_queue(self, tar, own_lock = False):
-        if own_lock:
-             if not self.queue_lock.locked():
-                 return
-        else:
-            self.queue_lock.acquire()
-            # print(f'LOCK ACQUIRED (add_to_queue)')
-
-        try:
-            if tar in self.event_queue:
-                print(f'Warning - Target already in queue ({tar.targetid})')
-            else:
-                self.click_queue.put(tar, block=True, timeout=1)
-                self.event_queue.append(tar)
-        except:
-            pass
-        finally:
-            if not own_lock:
-                self.queue_lock.release() 
-                # print(f'LOCK RELEASED (add_to_queue)')
-
+    def add_to_queue(self, tar):
+        return self.click_queue.add_if_unique(tar)
+       
     def get_fast_targets(self):
         return [tar for tar in self.targets if isinstance(tar, FastTarget) and tar.enable]
 
@@ -174,45 +133,13 @@ class ClickHandler:
                     potentials_targets[i].enable = False
         self.has_update = True
 
-    def add_multiple_to_queue(self, targets, own_lock=False):
-        if own_lock:
-            #  if not self.queue_lock.locked():
-            #      s(elf.queue_lock.acquire)
-            pass
-        else:
-            self.queue_lock.acquire()
-            # print(f'LOCK ACQUIRED (add_multiple_to_queue)')
-
-        for tar in targets:
-            self.add_to_queue(tar, True)
-        if not own_lock:
-            self.queue_lock.release() 
-            # print(f'LOCK RELEASE (add_multiple_to_queue)')
-
-    def get_from_queue(self, own_lock=False):
-        if own_lock:
-            #  if not self.queue_lock.locked():
-            #      pass
-            pass
-        else:
-            self.queue_lock.acquire()
-            # print(f'LOCK ACQUIRED (get_from_queue)')
-        try:
-            tar = self.click_queue.get_nowait()
-        except:
-            tar = None
-        finally:
-            if tar is not None:
-                self.event_queue.remove(tar)
-        if not own_lock:
-            self.queue_lock.release() 
-            # print(f'LOCK RELEASE (get_from_queue)')
-
-        return tar
+    def get_from_queue(self):
+        return self.click_queue.get_if_any()
 
     def clear_targets(self):
         self.stop()
         self.targets.clear()
+        self.click_queue.empty_queue()
         self.next_target=None
         self.fast_target=None
         self.id_cnt = 0
@@ -236,6 +163,7 @@ class ClickHandler:
             self.has_update = True
             for i in range(1, self.patience_level*self.patience_resolution+1):
                 if not self.running:
+                    self.next_target = None
                     break
                 self.wait_prog = self.patience_level - i/self.patience_resolution
                 self.has_update = True
@@ -244,6 +172,7 @@ class ClickHandler:
             self.wait_prog = self.patience_level
             self.increment_patience(-1)
             self.has_update = True
+            self.click_queue.refresh_queue()
             self.refresh_selection()
             add_wait = self.get_additionnal_wait()
             self.has_update = True
@@ -256,47 +185,18 @@ class ClickHandler:
     def update_thread(self):
         if self.running:
             try:
-                self.queue_lock.acquire()
-                if not self.running:
-                    return
                 for tar in self.targets:
                     if tar.enable and tar.check_trigger():
-                        if  not self.is_in_queue((tar.priority, tar), True):
-                            if self.next_target is None or tar is not self.next_target[1]:
+                        if self.next_target is None or tar is not self.next_target[1]:
+                            if self.add_to_queue((tar.priority, tar)):
                                 self.increment_patience(1)
                                 print(f'Added increment for target {tar.targetid}')
-                                self.add_to_queue((tar.priority, tar), True)
                                 self.has_update = True
-                        else:
-                            self.has_update = True
+                if not self.click_queue.is_empty() and not self.handling_one:
+                    print(f'INFO - Starting handling thread')
+                    Thread(target=self.handle_one, name='HandleOne').start()
             except Exception as e:
                 print(f'ERROR - ClickHandler - Update thread failed ({e})')
-            finally:
-                self.queue_lock.release()
-
-    def refresh_queue_t(self):
-        Thread(target=self.refresh_queue, name='refreshQueue').start()
-
-    def refresh_queue(self):
-        try:
-            self.queue_lock.acquire()
-            # print(f'LOCK ACQUIRED (refresh_queue)')
-            temp = []
-            while self.click_queue.qsize() > 0:
-                task = self.get_from_queue(True)
-                if task is not None:
-                    if task[1].check_trigger():
-                        temp.append(task)
-            if not self.next_target in temp:
-                self.next_target = None
-                self.has_update = True
-            self.add_multiple_to_queue(temp, own_lock=True)
-            self.has_update = True
-        except:
-            pass
-        finally:
-            self.queue_lock.release()
-            # print(f'LOCK RELEASED (refresh_queue)')
 
     def handle_task(self, task):
         result = False
@@ -308,6 +208,7 @@ class ClickHandler:
         finally:
             self.handle_lock.release()
             return result
+        
     def fast_click_thread(self):
         if not self.has_fast_target():
             return
@@ -316,78 +217,63 @@ class ClickHandler:
             if not self.running: break
         print('INFO - ClickHandler.fast_click_thread() thread finished')
 
-    # def self_destruct(self):
-    #     if not self.running and self.main_thread.is_alive():
-    #         ctype_async_raise(self.main_thread.native_id, SelfDestructException)
-
     def refresh_selection(self):
-        self.queue_lock.acquire()
-        try:
-            potential_target = self.get_from_queue(True)
-            if potential_target is not None and potential_target[1].priority < self.next_target[1].priority:
-                self.add_to_queue(self.next_target, True)
-                self.next_target = potential_target
-                self.has_update = True
-            else:
-                self.add_to_queue(potential_target, True)
+        pot = self.click_queue.change_if_higher_priority(self.next_target)
+        if pot is not None:
+            self.next_target = pot
+            self.has_update = True
 
-        except Exception as e:
-            print(f'ERROR - refresh_selection failed ({e})')
-        finally:
-            self.queue_lock.release()
+    def handle_one(self):
+        self.handling_one = True
+        self.next_target = self.get_from_queue()
+        self.has_update = True
+
+        if self.next_target is not None and self.next_target[1].triggered:
+            print(f'INFO - Handle_one() - Got a target ID[{self.next_target[1].targetid}]')
+            self.wait_additionnal_time()
+
+            if self.next_target is not None:
+
+                if self.handle_task(self.next_target[1]):
+                    self.last_click = self.next_target[1]
+                else:
+                    print(f'ERROR - Handling target {self.next_target[1].targetid} failed')
+
+                # self.wait(0.2)
+                self.next_target[1].check_trigger()
+
+                self.next_target = None
+                self.has_update = True
+                self.handling_one = False
+
+                # self.click_queue.refresh_queue()
+
+        print('INFO - ClickHandler.handle_one() thread finished')
 
     def run(self):
-        try:
-            self.additionnal_wait = 0
-            self.allocate_single_fast_target()
-            if self.has_fast_target():
-                self.fast_thread = Thread(target=self.fast_click_thread, name='FastClick')
-                self.fast_thread.start()
+        self.additionnal_wait = 0
+        self.allocate_single_fast_target()
+        if self.has_fast_target():
+            self.fast_thread = Thread(target=self.fast_click_thread, name='FastClick')
+            self.fast_thread.start()
 
-            #TODO Could be parameter on UI
-            tracker_Interval = 1 #self.patience_level/2
-            self.trigger_thread = RepeatedTimer(tracker_Interval, self.update_thread)
+        #TODO Could be parameter on UI
+        tracker_Interval = 2 #self.patience_level/2
+        self.trigger_thread = RepeatedTimer(tracker_Interval, self.update_thread)
 
-            if not self.trigger_thread.is_running:
-                self.trigger_thread.start()
+        if not self.trigger_thread.is_running:
+            self.trigger_thread.start()
 
+        if self.has_fast_target():
+            self.fast_thread.join()
+        else:
             while self.running:
-                self.next_target = self.get_from_queue()
-                self.has_update = True
+                time.sleep(1)
 
-                if self.next_target is not None and self.next_target[1].check_trigger():
-                    self.wait_additionnal_time()
+        self.stop()
+        self.trigger_thread.stop()
+        self.next_target=None
+        # self.self_destruct_thread.stop()
 
-                    # # Change if better priority
-                    # self.refresh_selection()
 
-                    self.queue_lock.acquire()
-                    if self.next_target is not None:
-
-                        if self.handle_task(self.next_target[1]):
-                            self.last_click = self.next_target[1]
-                        else:
-                            print(f'ERROR - Handling target {self.next_target[1].targetid} failed')
-
-                        self.wait(0.2)
-                        self.next_target[1].check_trigger()
-                        self.next_target = None
-                        self.queue_lock.release()
-                        
-                        self.refresh_queue_t()
-                        self.has_update = True
-                    else:
-                        self.queue_lock.release()
-                else:
-                    self.wait(self.patience_level)
-        except SelfDestructException:
-            print('Self destructed')
-            pass
-        finally:
-            self.stop()
-            self.trigger_thread.stop()
-            self.next_target=None
-            # self.self_destruct_thread.stop()
-            if self.has_fast_target():
-                self.fast_thread.join(timeout=10)
-            print('INFO - ClickHandler.Run() thread finished')
+        print('INFO - ClickHandler.Run() thread finished')
