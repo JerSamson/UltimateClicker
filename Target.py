@@ -14,7 +14,7 @@ from DetectionMode import detectionMode
 from RepeatedTimer import RepeatedTimer
 
 IMAGE_SIZE_X = 150
-IMAGE_SIZE_Y = 50
+IMAGE_SIZE_Y = 30
 
 class BaseTarget(object):
     def __init__(self, x, y, info_freq=0, active=False):
@@ -64,7 +64,7 @@ class BaseTarget(object):
         self.active=True
         self.handled=False
         if self.info_freq > 0:
-            self.infoTask = RepeatedTimer(self.info_freq, self.info)
+            self.infoTask = RepeatedTimer(self.info_freq, self.info, name=f'InfoTarget{self.targetid}')
         else: self.infoTask = None
 
     def to_csv(self):
@@ -260,7 +260,10 @@ class TrackerTarget(BaseTarget):
         self.color = None
         self.priority = self.get_priority()
         self.bg_color_acquisition()
-
+        self.last_handle = time.time()
+        self.last_color_trigger = None
+        self.delay_after_handle_2_trigger = 1
+        self.tolerance = 5
     def to_csv(self):
         return ['Tracker', self.x, self.y, int(self.mode)]
 
@@ -320,29 +323,39 @@ class TrackerTarget(BaseTarget):
 
     def check_trigger(self):
         if not self.is_ready():
-            self.triggered = False
+            raise Exception('Tried to check trigger before ref was acquired')
+        
+        if time.time() - self.last_handle < self.delay_after_handle_2_trigger:
+            print(f'WARN - TARGET[{self.targetid}] - Too soon after handling to check trigger to avoid capturing the cursor. Skipping')
             return False
         
+        start = time.time_ns()
+
         old_value = self.triggered
         cur_color = self.get_color()
 
+        if cur_color == (30, 30, 30):
+            print('THATS MY CURSOR BITCH STOP STOP')
+            return False
+
         if self.mode == detectionMode.same:
-            self.triggered = self.color == cur_color
+            self.triggered = self.compare_color(cur_color)
         elif self.mode in [detectionMode.different, detectionMode.change]:
-            self.triggered = self.color != cur_color
+            self.triggered = not self.compare_color(cur_color)
         else:
             raise Exception('Unsupported trigger mode')
         
         if (not old_value and self.triggered): # Has become triggered
+            print(f'Target {self.targetid} has triggered. now:{cur_color} ref:{self.color}')
             self.handled = False
             # print(f'Target {self.targetid} triggered.\n\tcur:{cur_color} og:{self.color}')
-            
-        elif not self.triggered:
-            self.handled = True
 
         if self.triggered:
-            # print(f'Target {self.targetid} is triggered. cur:{cur_color} og:{self.color}')
-            pass
+            self.last_color_trigger = cur_color 
+        else:
+            self.handled = True
+
+        print(f'INFO - TARGET[{self.targetid}] - Checked trigger in {int((time.time_ns()-start)/1000000)}ms')
 
         return self.triggered        
     
@@ -350,6 +363,17 @@ class TrackerTarget(BaseTarget):
         if self.active:
             pass
 
+    def compare_color(self, color):
+        dR = abs(self.color[0] - color[0])
+        dG = abs(self.color[1] - color[1])
+        dB = abs(self.color[2] - color[2])
+        dTotal = dR+dG+dB 
+        same = dTotal < self.tolerance
+
+        if same and self.color != color:
+            print(f'INFO - TARGET[{self.targetid}] - Would have triggered with lower tolerance (diff {dTotal})')
+
+        return same
 
     def handle(self):
         if self.active and self.enable and not self.handled:
@@ -357,11 +381,13 @@ class TrackerTarget(BaseTarget):
             self.times_clicked+=1
             if self.mode == detectionMode.change:
                 self.bg_color_acquisition()
-            print(f'Handled Target {self.targetid}')
+            print(f'INFO - Handled Target {self.targetid}')
             self.handled=True
             self.triggered = False
-            self.check_trigger()
+            self.last_handle = time.time()
             return True
         else:
+            err = 'inactive' if not self.active else 'disabled' if not self.enable else 'already handled'
+            print(f'ERROR - TARGET - Could not handle (Target {err})')
             return False
 

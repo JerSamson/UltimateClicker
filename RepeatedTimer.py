@@ -1,13 +1,14 @@
 from threading import Thread, Timer
 
 class RepeatedTimer(object):
-    def __init__(self, interval, function, *args, **kwargs):
+    def __init__(self, interval, function, name=None, *args, **kwargs):
         self._timer     = None
         self.interval   = interval
         self.function   = function
         self.args       = args
         self.kwargs     = kwargs
         self.is_running = False
+        self._name = name
         self.start()
 
     def _run(self):
@@ -18,6 +19,8 @@ class RepeatedTimer(object):
     def start(self):
         if not self.is_running:
             self._timer = Timer(self.interval, self._run)
+            if self._name is not None:
+                self._timer.name = self._name
             self._timer.start()
             self.is_running = True
 

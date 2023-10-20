@@ -30,6 +30,8 @@ NEXT_FRAME          ='-NEXTTARFRAME-'
 LAST_FRAME          ='-LASTTARFRAME-'
 TARGET_TABLE        = '-TARGETS-'
 DETAIL_ID           = '-DETAILID-'
+BIG_CPS             = '-BIGCPS-'
+BIG_TOTAL           = '-BIGTOT-'
 TIMES_CLICKED       = '-NBCLICKS-'
 SAVE_BTN            = '-SAVE-'
 LOAD_BTN            = '-LOAD-'
@@ -117,14 +119,13 @@ class App:
         )
 
         selection_buttons = [
-            sg.Button('Set Targets', key=SET_TARGET_BTN, button_color = DISABLED_COLOR),
-            sg.VSeparator(key=TARGET_VSEP),
-            sg.Button('same', key=MODE_SAME_BTN, button_color = DISABLED_COLOR, visible=False),
-            sg.Button('diff', key=MODE_DIFF_BTN, button_color = DISABLED_COLOR, visible=False),
-            sg.Button('change', key=MODE_CHANGE_BTN, button_color = DISABLED_COLOR, visible=False),
-            sg.Button('fastClick', key=FAST_TRACK_BTN, button_color = DISABLED_COLOR, visible=False),
-            # sg.VSeparator(),
-            # sg.Button('', key=COLOR_BTN, size=COLOR_PREVIEW_SIZE ,button_color = DISABLED_COLOR, visible=False),
+            sg.Sizer(0, 0),
+            sg.Button('Set Targets', key=SET_TARGET_BTN, expand_x=True, expand_y=True),
+            # sg.VSeparator(key=TARGET_VSEP),
+            sg.Button('same', key=MODE_SAME_BTN, button_color = DISABLED_COLOR, visible=False, expand_x=True, expand_y=True),
+            sg.Button('diff', key=MODE_DIFF_BTN, button_color = DISABLED_COLOR, visible=False, expand_x=True, expand_y=True),
+            sg.Button('change', key=MODE_CHANGE_BTN, button_color = DISABLED_COLOR, visible=False, expand_x=True, expand_y=True),
+            sg.Button('fastClick', key=FAST_TRACK_BTN, button_color = DISABLED_COLOR, visible=False, expand_x=True, expand_y=True),
             ]
 
 
@@ -167,16 +168,22 @@ class App:
         # ]
 
         track_tab=[
-            [sg.Sizer(700,0)],
+            [sg.Sizer(0,0)],
             selection_buttons,
+            [sg.Sizer(0,0)],
+            [sg.Text(key=BIG_CPS, visible=False, expand_x=True, expand_y=True, font=('Arial Bold', 32), justification='center')],
+            [sg.Text(key=BIG_TOTAL, visible=False, expand_x=True, expand_y=True, font=('Arial Bold', 28), justification='center')],
+            [sg.Sizer(0,0)],
             [sg.Slider(range=(0, 20), default_value=5,
                 expand_x=True, enable_events=True,
                 orientation='horizontal', key=PATIENCE_SLIDER)],
             [sg.ProgressBar(10, orientation='h', expand_x=True, size=(20, 5),  key=PATIENCE_PROGRESS_2, visible=False, bar_color='blue')],
             [sg.ProgressBar(10, orientation='h', expand_x=True, size=(20, 20), border_width= 3,  key=PATIENCE_PROGRESS, visible=False)],
-            [sg.Text(key=NEXT_TARGET, visible=False)],
-            [target_table],
+            # [sg.Text(key=NEXT_TARGET, visible=False)],
+            [sg.Sizer(0,0)],
             details,
+            [sg.Sizer(0,0)],
+            [target_table],
         ]
 
 
@@ -185,7 +192,7 @@ class App:
             [sg.TabGroup([[
                 # sg.Tab('idle', idle_tab),
                 # sg.Tab('fast', fast_tab),
-                sg.Tab('Track', track_tab)
+                sg.Tab('Track', track_tab,element_justification='center')
             ]])],
         [
         sg.Button('CLICK!', key=CLICK_BTN, visible=True),
@@ -199,7 +206,7 @@ class App:
         ]
         font = ("Arial", 12)
         # Create the window
-        self.window = sg.Window("UltimateClicker", layout, location=(1100,100), font=font)
+        self.window = sg.Window("UltimateClicker", layout, location=(1100,100), font=font, element_justification='center')
 
     def display_current(self):
         self.graph_cur.erase()
@@ -236,6 +243,7 @@ class App:
                     tar = IdleTarget(int(row[1]), int(row[2]))
                 if tar is not None:
                     self.add_target(tar, False)
+
             # self.track_ready_thread.join()
     def save_targets(self, save_file):
         if len(self.targets) == 0:
@@ -265,7 +273,7 @@ class App:
 
     def draw_next(self):
         next = self.queue.next_target
-        if next is not None:
+        if next is not None and self.queue.waiting:
             self.draw(next[1], self.graph_next)
             self.next_target_drew = next
         else:
@@ -299,7 +307,6 @@ class App:
             self.window[MODE_DIFF_BTN].update(button_color = ENABLED_COLOR if self.mode == detectionMode.different else DISABLED_COLOR)
             self.window[MODE_CHANGE_BTN].update(button_color = ENABLED_COLOR if self.mode == detectionMode.change else DISABLED_COLOR)
             self.window[FAST_TRACK_BTN].update(button_color = ENABLED_COLOR if self.mode == detectionMode.fast else DISABLED_COLOR)
-            self.window[SET_TARGET_BTN].update(button_color = ENABLED_COLOR if self.setting_targets else DISABLED_COLOR)
 
             self.window[SET_TARGET_BTN].update(visible=not self.running)
             self.window[MODE_SAME_BTN].update(visible=self.setting_targets)
@@ -311,7 +318,9 @@ class App:
             self.window[PATIENCE_SLIDER].update(visible=not self.running)
             self.window[PATIENCE_PROGRESS].update(visible=self.running)
             self.window[PATIENCE_PROGRESS_2].update(visible=self.running)
-            self.window[NEXT_TARGET].update(visible=self.running)
+            # self.window[NEXT_TARGET].update(visible=self.running)
+            self.window[BIG_CPS].update(visible=self.running)
+            self.window[BIG_TOTAL].update(visible=self.running)
 
             Thread(target=self.update_cursor, name='UpdateCursor').start()
 
@@ -362,6 +371,8 @@ class App:
                 priority = tar.priority
                 clicks = self.nice_notation("{:.1E}".format(int(tar.times_clicked))) if tar.times_clicked > 10000 else tar.times_clicked
                 treedata.insert("Fast", str(tar.targetid),str(tar.targetid), [priority, "Fast", f'{clicks} ({int(tar.cps)}cps)', state]) #str(tar.pos())])
+                self.window[BIG_CPS].update(value=f'{int(tar.cps)}cps')
+                self.window[BIG_TOTAL].update(value=f'{clicks}clicks')
             elif type(tar) is IdleTarget:
                 state = 'Disabled' if not tar.enable else 'Stopped' if not tar.active else 'Active'
                 priority = tar.priority
@@ -378,11 +389,6 @@ class App:
         y_outside = y < winPos_acc[1] or y > winPos[1] + winSize[1]
         return not x_outside and not y_outside
 # =-=-=-=-= CALLBACKS =-=-=-=-=
-    def click_listener(self):
-        with Listener(on_move=self.on_move, on_click=self.on_click, on_scroll=self.on_scroll) as self.listener:
-            self.listener.join()
-            print('INFO - UI.click_listener() thread finished')
-
     def on_move(self, x, y):
         if self.setting_targets:
             pass
@@ -420,9 +426,11 @@ class App:
                 tar = FastTarget(x, y, 0)
             else:
                 return
-            self.add_target(tar)
+            self.add_target(tar, not tar.is_ready())
 
-            Timer(0.1, self.window.bring_to_front).start()
+            t = Timer(0.1, self.window.bring_to_front)
+            t.name='BringToFront'
+            t.start()
 
     def set_mode(self, m):
         self.mode = m
@@ -430,6 +438,7 @@ class App:
 # =-=-=-=-==-=-=-=-==-=-=-=-=
 
     def track_ready(self):
+        print('INFO - UI.track_ready() thread started')
         nb_ready = 0
         n=0
         self.all_targets_ready = False
@@ -460,17 +469,18 @@ class App:
             self.window[PATIENCE_PROGRESS_2].update(current_count=0, bar_color='blue')
             self.window[PATIENCE_PROGRESS].update(current_count=self.queue.additionnal_wait, bar_color='blue')
             last_click_id = self.queue.last_click.targetid if self.queue.last_click is not None else 'None'
-            self.window[NEXT_TARGET].update(value=f'Next Target ID: Waiting for target\nLast Target ID: {last_click_id}')
+            # self.window[NEXT_TARGET].update(value=f'Next Target ID: Waiting for target\nLast Target ID: {last_click_id}')
         else:
             self.window[PATIENCE_PROGRESS].update(current_count=self.queue.additionnal_wait, bar_color='green')
             self.window[PATIENCE_PROGRESS_2].update(current_count=self.queue.wait_prog, max=self.queue.patience_level, bar_color='green')
             if self.queue.next_target is not None:
                 last_click_id = self.queue.last_click.targetid if self.queue.last_click is not None else 'None'
-                self.window[NEXT_TARGET].update(value=f'Next Target ID: {self.queue.next_target[1].targetid}\nLast Target ID: {last_click_id}')
+                # self.window[NEXT_TARGET].update(value=f'Next Target ID: {self.queue.next_target[1].targetid}\nLast Target ID: {last_click_id}')
 
 
 
     def run_queue(self):
+        print('INFO - UI.run_queue() thread started')
         task=None
         self.setting_targets = False
         self.running = True
@@ -494,20 +504,15 @@ class App:
         if track:
             Thread(target=self.track_ready, name='TrackReady').start()
 
-        # self.track_target_lock.acquire()
-        # if track and not self.track_ready_thread_started and not self.track_ready_thread.is_alive():
-        #     self.track_ready_thread.start()
-        #     self.track_ready_thread_started = True
-        # self.track_target_lock.release()
     def remove_target(self, tar):
         self.queue.remove_target(tar)
 
     def run(self):
         try:
             # Create an event loop
-            self.click_listener_thread = Thread(target=self.click_listener, daemon=True, name='click_listener')
+            self.click_listener_thread = Listener(on_move=self.on_move, on_click=self.on_click, on_scroll=self.on_scroll)
+            self.click_listener_thread.name='ClickListener'
             self.click_listener_thread.start()
-
             while True:
                 timeout = 100 if not self.running else 1000
                 event, values = self.window.read(timeout=timeout, timeout_key='NA')
@@ -552,11 +557,11 @@ class App:
                     self.queue.clear_targets()
                     self.selected_target = None
                 elif event == CLICK_BTN:
-                    if not self.all_targets_ready:
+                    if not self.are_targets_ready():
                         print('Not all targets ready. Cant run.')
                         continue
                     time.sleep(0.5)
-                    Thread(target=self.run_queue, daemon=True).start()
+                    Thread(target=self.run_queue, daemon=True, name='RunQueue').start()
                 elif TARGET_TABLE in event:
                     try:
                         t = [tar for tar in self.targets if tar.targetid == int(values[TARGET_TABLE][0])]
@@ -581,11 +586,11 @@ class App:
                     for t in [tar for tar in self.targets if isinstance(tar, TrackerTarget)]:
                         t.enable = not t.enable
 
-            self.listener.stop()
+            self.click_listener_thread.stop()
             self.click_listener_thread.join()
             self.window.close()
         except Exception as e:
-            self.listener.stop()
+            self.click_listener_thread.stop()
             self.click_listener_thread.join()
             self.window.close()
             raise e
