@@ -9,9 +9,18 @@ import getpixelcolor
 import win32api, win32con
 import pyscreenshot as ImageGrab
 import pyautogui
-
+# from pynput import mouse
+from pynput.mouse import Button, Controller
+from pynput.mouse import Controller, Button
 from DetectionMode import detectionMode
 from RepeatedTimer import RepeatedTimer
+
+import mouse
+def click_mouse(x, y, button):
+    mouse.move(x, y, absolute=True)
+    mouse.click(button=button)
+
+pyautogui.PAUSE = 0
 
 IMAGE_SIZE_X = 150
 IMAGE_SIZE_Y = 30
@@ -26,9 +35,10 @@ class BaseTarget(object):
         self.triggered=False
         self.handled=False
         self.targetid=-1
-        self.enable = True
+        self.enabled = True
         self.times_clicked=0
         self.ref_area = None
+        self.mouse = Controller()
         self.type_priority = {
             TrackerTarget :  100,
             IdleTarget    :  1000,
@@ -50,10 +60,13 @@ class BaseTarget(object):
         return (self.x, self.y)
 
     def click(self):
-        win32api.SetCursorPos((self.x,self.y))
-        win32api.mouse_event(win32con.MOUSEEVENTF_LEFTDOWN,self.x,self.y,0,0)
-        win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP,self.x,self.y,0,0)
-    
+
+        if self.active and self.mouse.position != (self.x, self.y):
+            win32api.SetCursorPos((self.x,self.y))
+
+        self.mouse.click(button=Button.left)
+        self.times_clicked+=1
+
     def stop(self):
         self.active=False
         self.handled=True
@@ -92,7 +105,7 @@ class IdleTarget(BaseTarget):
         if self.active:
             os.system('cls')
             print(f'Total time:\t{int(time.time()-self.start)}s')
-            print(f'Total clicks:\t{self.nb_clicks} clicks')
+            print(f'Total clicks:\t{self.times_clicked} clicks')
             print(f'Next click in:\t{int(math.ceil(self.idle_delay - (time.time() - self.last_click)))}s')
     
     def get_priority(self):
@@ -103,7 +116,7 @@ class IdleTarget(BaseTarget):
             return p
     
     def to_csv(self):
-        return ['IDLE', self.x, self.y, '']
+        return ['IDLE', self.x, self.y, '', self.times_clicked]
 
     def get_ref_area(self):
         try:
@@ -129,7 +142,6 @@ class IdleTarget(BaseTarget):
     def handle(self):
         if self.active and not self.handled:
             self.click()
-            self.times_clicked+=1
             self.handled=True
             return True
         else:
@@ -140,17 +152,17 @@ class FastTarget(BaseTarget):
     def __init__(self, x, y, info_freq=0, active=False):
         BaseTarget.__init__(self, x, y, info_freq, active)
         self.delay = 0.0001
+        self.init_delay = self.delay 
         self.most_efficient_delay = self.delay
         self.first_click_time = 0
         self.cps         = 0
-        self.cps_theo    = 0
+        # self.cps_theo    = 0
         self.highest_cps = 0
 
-        self.nb_clicks      = 0
         self.last_nb_clicks = 0
 
-        self.nb_clicks_theo = 0
-        self.last_nb_clicks_theo = 0
+        # self.nb_clicks_theo = 0
+        # self.last_nb_clicks_theo = 0
         self.get_ref_area()
         self.last_cps_time = 0
         self.cps_compute_freq = 1
@@ -167,12 +179,12 @@ class FastTarget(BaseTarget):
             return p
 
     def to_csv(self):
-        return ['Fast', self.x, self.y, '']
+        return ['Fast', self.x, self.y, '', self.times_clicked]
 
     def click(self):
         if self.first_click_time == 0:
             self.first_click_time = time.time()
-        self.nb_clicks = self.nb_clicks + 1
+        # self.nb_clicks = self.nb_clicks + 1
         return super().click()
 
     def get_ref_area(self):
@@ -196,18 +208,21 @@ class FastTarget(BaseTarget):
     
     def stop(self):
         self.cps = 0
+        self.first_click_time = 0
         return super().stop()
     
     def info(self):
-        if self.active and self.enable:
+        if self.active and self.enabled:
             os.system('cls')
-            print(f'\rTotal time:\t{int(time.time()-self.start_time)}s')
-            print(f'\rTotal clicks:\t{self.nb_clicks} clicks')
+            now = time.time()
+            print(f'\rTotal time:\t{int(now-self.start_time)}s')
+            print(f'\rTotal clicks:\t{self.times_clicked} clicks')
             print(f'\rCPS:\t\t{int(self.cps)}cps')
-            print(f'\rCPS_t:\t\t{int(self.cps_theo)}cps')
-            print(f'avg cps:\t{int(self.nb_clicks/(time.time()-self.start_time))}cps')
+            # print(f'\rCPS_t:\t\t{int(self.cps_theo)}cps')
+            print(f'avg cps:\t{int(self.times_clicked/(now-self.start_time))}cps')
             print(f'\nhighest cps:{int(self.highest_cps)}s')
 
+            print(f'\Initial Delay:\t\t{round(self.init_delay*1000,5)}ms')
             print(f'\rDelay:\t\t{round(self.delay*1000,5)}ms')
             print(f'\nmost efficient delay:{round(self.most_efficient_delay*1000,5)}s')
 
@@ -217,34 +232,33 @@ class FastTarget(BaseTarget):
     def handle(self):
         if self.active:
             self.click()
-            self.times_clicked+=1
             # time.sleep(self.delay)
             if time.time() - self.last_cps_time > self.cps_compute_freq:
                 self.update_cps()
-            # self.tweak_delay()
+                # self.tweak_delay()
             return True
         else:
             return False
 
     def tweak_delay(self):
-        if (self.cps_theo - self.cps) <= 5:
+        if self.cps > self.highest_cps:
             self.delay *= 0.999
         else:
-            self.delay = self.most_efficient_delay*(self.cps_theo/self.cps) 
+            self.delay = self.most_efficient_delay#*(self.cps_theo/self.cps) 
     
     def update_cps(self):
         if self.first_click_time == 0:
             return
         
         now = time.time()
-        self.cps = (self.nb_clicks - self.last_nb_clicks)/(now - self.last_cps_time)
-        self.cps_theo = (self.nb_clicks_theo - self.last_nb_clicks_theo)/(now - self.last_cps_time)
+        self.cps = (self.times_clicked - self.last_nb_clicks)/(now - self.last_cps_time)
         self.last_cps_time = now
-        self.last_nb_clicks= self.nb_clicks
-        self.last_nb_clicks_theo = self.nb_clicks_theo
+        self.last_nb_clicks= self.times_clicked
+
         if self.cps > self.highest_cps:
             self.highest_cps = self.cps
             self.most_efficient_delay = self.delay
+
         # self.tweak_delay()
 
 
@@ -265,7 +279,7 @@ class TrackerTarget(BaseTarget):
         self.delay_after_handle_2_trigger = 1
         self.tolerance = 5
     def to_csv(self):
-        return ['Tracker', self.x, self.y, int(self.mode)]
+        return ['Tracker', self.x, self.y, int(self.mode), self.times_clicked]
 
     def get_priority(self):
         p = self.type_priority[TrackerTarget]
@@ -322,12 +336,13 @@ class TrackerTarget(BaseTarget):
         Thread(target=self.color_acquisition, daemon=True, name='bg_color_acquisition').start()
 
     def check_trigger(self):
-        if not self.is_ready():
-            raise Exception('Tried to check trigger before ref was acquired')
-        
+
         if time.time() - self.last_handle < self.delay_after_handle_2_trigger:
             print(f'WARN - TARGET[{self.targetid}] - Too soon after handling to check trigger to avoid capturing the cursor. Skipping')
             return False
+        
+        if not self.is_ready():
+            raise Exception(f'Tried to check trigger before ref was acquired (TARGET[{self.targetid}])')
         
         start = time.time_ns()
 
@@ -355,7 +370,7 @@ class TrackerTarget(BaseTarget):
         else:
             self.handled = True
 
-        print(f'INFO - TARGET[{self.targetid}] - Checked trigger in {int((time.time_ns()-start)/1000000)}ms')
+        # print(f'INFO - TARGET[{self.targetid}] - Checked trigger in {int((time.time_ns()-start)/1000000)}ms')
 
         return self.triggered        
     
@@ -376,9 +391,8 @@ class TrackerTarget(BaseTarget):
         return same
 
     def handle(self):
-        if self.active and self.enable and not self.handled:
+        if self.active and self.enabled and not self.handled:
             self.click()
-            self.times_clicked+=1
             if self.mode == detectionMode.change:
                 self.bg_color_acquisition()
             print(f'INFO - Handled Target {self.targetid}')
@@ -387,7 +401,38 @@ class TrackerTarget(BaseTarget):
             self.last_handle = time.time()
             return True
         else:
-            err = 'inactive' if not self.active else 'disabled' if not self.enable else 'already handled'
+            err = 'inactive' if not self.active else 'disabled' if not self.enabled else 'already handled'
             print(f'ERROR - TARGET - Could not handle (Target {err})')
             return False
 
+class GOLDENTARGET(BaseTarget):
+    def __init__(self, x, y):
+        super().__init__(x, y, 0, False)
+
+    def get_priority(self):
+        return -999
+    def is_ready(self):
+        return True
+    def check_trigger(self):
+        return True
+    def handle(self):
+        self.single_shot_triggered = True
+        win32api.SetCursorPos((self.x,self.y))
+        self.mouse.click(button=Button.left)
+        self.times_clicked+=1
+        self.handled = True
+
+    # def __init__(self, x, y, zone_area, mode, mindist=0, info_freq=False, active=False):
+    #     super().__init__(x, y, zone_area, mode, mindist, info_freq, active) 
+    #     self.priority_mode = 'AlwaysTop'
+    #     self.single_shot_triggered = False
+
+    # def get_priority(self):
+    #     return -999
+    # def is_ready(self):
+    #     return True
+    # def check_trigger(self):
+    #     return True
+    # def handle(self):
+    #     self.single_shot_triggered = True
+    #     return super().handle()
