@@ -49,7 +49,10 @@ class BaseTarget(object):
 
     def __lt__(self, target): 
         return self.priority < target.priority
-         
+
+    def __eq__(self, __value: object) -> bool:
+        return self.x == __value.x and self.y == __value.y and type(self) == type(__value)
+
     def get_priority(self, tar):
         raise NotImplementedError()
     

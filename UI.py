@@ -236,7 +236,7 @@ class App:
             selection_buttons,
             [sg.Sizer(0,0)],
             [sg.Sizer(0,0), sg.Text(key=BIG_TOTAL, visible=False, expand_x=True, expand_y=True, font=(detailsFont, 35), justification='center')],
-            [sg.Sizer(0,0), sg.Text(key=BIG_CPS, visible=False, expand_x=True, expand_y=True, font=(detailsFont, 22), justification='center')],
+            [sg.Sizer(0,0), sg.Text(key=BIG_CPS, visible=False, expand_x=True, expand_y=True, font=(detailsFont, 22), justification='center', text_color='gold')], #DAA520
             [sg.Sizer(0,0), sg.Text(key=BIG_GOLD, visible=False, expand_x=True, expand_y=True, font=(detailsFont, 16), justification='center', text_color='gold')],
             [sg.Sizer(0,0)],
             [sg.Sizer(0,0), self.patience_slider],
@@ -352,6 +352,7 @@ class App:
     def load_targets(self, save_file):
         print(f'INFO - load_targets - Loading targets from {save_file}')
         try:
+            self.queue.clear_targets()
             file_path = self.saves_directory + save_file
             with open(file_path, 'r') as file:
                 csvreader = csv.reader(file)
@@ -663,6 +664,10 @@ class App:
         print('INFO - UI.run_queue() thread finished')
 
     def add_target(self, tar, track=True):
+        if tar in self.queue.targets:
+            print(f'WARN - UI.add_target() - Target already in queue')
+            return
+        
         self.queue.add_target(tar)
         self.targets = self.queue.targets
         # self.allowed_positions = [(tar.x, tar.y) for tar in self.targets]
