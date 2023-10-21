@@ -7,6 +7,7 @@ from ClickHandler import ClickHandler
 from Target import *
 import cursor
 import csv
+import os 
 pyautogui.PAUSE = 0
 
 millnames = ['',' Thousand',' Million',' Billion',' Trillion']
@@ -100,6 +101,7 @@ class App:
         self.all_targets_ready = False
         self.mode = detectionMode.fast
 
+        self.cwd = os.path.dirname(os.path.realpath(__file__)) + '\\'
         self.saves_directory = 'SavedTargets\\'
         self.zone_size = 10
         self.track_target_lock = Lock()
@@ -116,7 +118,8 @@ class App:
         self.max_patience = 20
         self.tab_size_x = 50
         self.tab_size_y = 1
-
+        self.autosave_freq = 5 # min
+        self.last_autosave = time.time()
         self.cur_x = 0
         self.cur_y = 0
 
@@ -302,6 +305,7 @@ class App:
 
     def autosave(self):
         self.save_targets('auto_save')
+        self.last_autosave = time.time()
 
     def Choose_file_popup(self, text, data, can_create=False):
         if can_create:
@@ -345,18 +349,18 @@ class App:
             return None
 
     def choose_load_file(self):
-        files = [f for f in os.listdir(self.saves_directory)]
+        files = [f for f in os.listdir(self.cwd + self.saves_directory)]
         return self.Choose_file_popup(text="Choose file to load", data=files)
 
     def choose_save_file(self):
-        files = [f for f in os.listdir(self.saves_directory)]
+        files = [f for f in os.listdir(self.cwd + self.saves_directory)]
         return self.Choose_file_popup(text="Choose file to save", data=files, can_create=True)
 
     def load_targets(self, save_file):
         print(f'INFO - load_targets - Loading targets from {save_file}')
         try:
             self.queue.clear_targets()
-            file_path = self.saves_directory + save_file
+            file_path = self.cwd + self.saves_directory + save_file
             with open(file_path, 'r') as file:
                 csvreader = csv.reader(file)
 
@@ -387,7 +391,7 @@ class App:
             return
         try:
             print(f'INFO - save_targets - Saving targets to {save_file}')
-            file_path = self.saves_directory + save_file
+            file_path = self.cwd + self.saves_directory + save_file
             with open(file_path, 'w', newline='') as file:
                 writer = csv.writer(file)
                 for tar in self.targets:
@@ -531,7 +535,7 @@ class App:
         if self.queue.has_fast_target():
             self.window[BIG_CPS].update(visible=self.running)
             self.window[BIG_TOTAL].update(visible=self.running)
-            self.window[BIG_CPS].update(value=f'{int(self.queue.fast_target.cps)} CPS')
+            self.window[BIG_CPS].update(value=f'{int(self.queue.fast_target.cps)} CPS ({int(self.queue.fast_target.avg_cps)} avg)')
             self.window[BIG_TOTAL].update(value=f'{millify(self.queue.fast_target.times_clicked)}')
             self.window[BIG_GOLD].update(value=f'{self.queue.golden_clicked} Golden Cookie{"s" if self.queue.golden_clicked > 1 else ""}')
         else:
@@ -758,6 +762,10 @@ class App:
                     self.targets = self.queue.targets
                     # self.allowed_positions = [(tar.x, tar.y) for tar in self.targets]
 
+                if self.running and self.autosave_freq > 0 and time.time() - self.last_autosave >= self.autosave_freq*60:
+                    print(f'INFO - UI.run() - Automatic save (Set for every {self.autosave_freq} minutes)')
+                    self.autosave()
+                    
                 self.update_graphs()
                 self.update_patience_slider()
 

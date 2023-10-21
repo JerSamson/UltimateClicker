@@ -15,6 +15,9 @@ from pynput.mouse import Controller, Button
 from DetectionMode import detectionMode
 from RepeatedTimer import RepeatedTimer
 
+from numba import jit, cuda 
+import numpy as np 
+
 import mouse
 def click_mouse(x, y, button):
     mouse.move(x, y, absolute=True)
@@ -158,9 +161,10 @@ class FastTarget(BaseTarget):
         self.init_delay = self.delay 
         self.most_efficient_delay = self.delay
         self.first_click_time = 0
-        self.cps         = 0
-        # self.cps_theo    = 0
-        self.highest_cps = 0
+        self.cps          = 0
+        self.avg_cps      = 0
+        self.n_cps_sample = 0
+        self.highest_cps  = 0
 
         self.last_nb_clicks = 0
 
@@ -171,6 +175,14 @@ class FastTarget(BaseTarget):
         self.cps_compute_freq = 1
         self.start_time       = time.time()
 
+    def approxCpsAverage(self, new_sample):
+        self.n_cps_sample += 1
+        avg = self.avg_cps
+        avg -= avg / self.n_cps_sample
+        avg += new_sample / self.n_cps_sample
+        self.avg_cps = avg
+        return self.avg_cps
+    
     def is_ready(self):
         return True
 
@@ -211,9 +223,18 @@ class FastTarget(BaseTarget):
     
     def stop(self):
         self.cps = 0
+        self.avg_cps = 0
+        self.n_cps_sample = 0
         self.first_click_time = 0
         return super().stop()
     
+    def start(self):
+        self.cps = 0
+        self.avg_cps = 0
+        self.n_cps_sample = 0
+        self.first_click_time = 0
+        return super().start()
+
     def info(self):
         if self.active and self.enabled:
             os.system('cls')
@@ -262,7 +283,10 @@ class FastTarget(BaseTarget):
             self.highest_cps = self.cps
             self.most_efficient_delay = self.delay
 
+        if self.times_clicked > 100:
+            self.approxCpsAverage(self.cps)
         # self.tweak_delay()
+
 
 
 class TrackerTarget(BaseTarget):
@@ -338,6 +362,7 @@ class TrackerTarget(BaseTarget):
         self.acquired = False
         Thread(target=self.color_acquisition, daemon=True, name='bg_color_acquisition').start()
 
+    # @jit(target_backend='cuda', forceobj=True)
     def check_trigger(self):
 
         if time.time() - self.last_handle < self.delay_after_handle_2_trigger:
@@ -364,7 +389,7 @@ class TrackerTarget(BaseTarget):
             raise Exception('Unsupported trigger mode')
         
         if (not old_value and self.triggered): # Has become triggered
-            print(f'Target {self.targetid} has triggered. now:{cur_color} ref:{self.color}')
+            print(f'INFO - TARGET[{self.targetid}] has triggered. now:{cur_color} ref:{self.color}')
             self.handled = False
             # print(f'Target {self.targetid} triggered.\n\tcur:{cur_color} og:{self.color}')
 

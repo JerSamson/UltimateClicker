@@ -11,6 +11,8 @@ from pywinauto import Desktop
 from pywinauto import mouse
 from pywinauto.application import Application
 from Target import GOLDENTARGET
+from numba import jit, cuda 
+import numpy as np 
 
 THRESHOLD_VALUE = 127  # Tweak as needed
 # The reference image of the golden cookie
@@ -21,7 +23,6 @@ cheat_path = os.path.join(os.path.dirname(__file__), 'cheat.jpg')
 TESTING = False
 # When true, will automatically click the golden cookie when it appears
 AUTOCLICK = False
-
 
 def get_cookie_clicker_screenshot():
     if TESTING:
@@ -42,7 +43,6 @@ def get_cookie_clicker_screenshot():
     ret, img = cv2.threshold(img, THRESHOLD_VALUE, 255, cv2.THRESH_BINARY)
     return img
 
-
 def prepare_reference_image(image_path):
     # Open the image and convert it to grayscale
     img = Image.open(image_path).convert('L')
@@ -56,7 +56,6 @@ def prepare_reference_image(image_path):
     keypoints, descriptors = sift.detectAndCompute(img_array, None)
     # Return the keypoints and descriptors
     return keypoints, descriptors, img_array
-
 
 def find_golden_cookie(screenshot, kp_reference, des_reference, img_reference):
     sift = cv2.SIFT_create()
@@ -91,9 +90,7 @@ def click_mouse(x, y):
     time.sleep(0.2)
     mouse.release(button='left', coords=(x, y))
 
-
 def SEEK_GOLDEN_COOKIES():
-    try:
         # current_x, current_y = win32api.GetCursorPos()
 
         # print("Mouse position is (", current_x, ",", current_y, ")")
@@ -104,13 +101,11 @@ def SEEK_GOLDEN_COOKIES():
                                 des_reference, img_reference)
         if x >= 0 and y >= 0:
             x, y = int(x), int(y)
-            print("******** Cookie found at:", datetime.datetime.now(),
-                "at (", int(x), ", ", int(y), ")")
+            # print("******** Cookie found at:", datetime.datetime.now(),
+            #     "at (", int(x), ", ", int(y), ")")
 
             return GOLDENTARGET(x, y)
         else:
             return None
-    except Exception as e:
-        print('Could not click gold cookie T_T [{e}]')
-        return None
+
         
