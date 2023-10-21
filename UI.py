@@ -127,14 +127,15 @@ class App:
         fast_tab=[[sg.Text('FAST',  size=(self.tab_size_x, self.tab_size_y))]]
 
         # =========================== SETTINGS TAB ===========================
+        text_width = 16
         settings_tab=[
-            [sg.Text('Saves Dir', size=(15,1)), sg.InputText(key=SAVE_FOLDER, size=(15,1)), sg.Text(key=SAVE_FOLDER_CUR, text=self.saves_directory, text_color='light gray')], 
-            [sg.Text('Target zone', size=(15,1)), sg.InputText(key=TARGET_ZONE, size=(15,1)), sg.Text(key=TARGET_ZONE_CUR, text=self.zone_size, text_color='light gray')], 
-            [sg.Text('UI refresh', size=(15,1)), sg.InputText(key=UI_UPDATE, size=(15,1)), sg.Text(key=UI_UPDATE_CUR, text=self.UI_update_rate, text_color='light gray')], 
-            [sg.Text('Trigger check rate', size=(15,1)), sg.InputText(key=TRIGGER_CHECK_RATE, size=(15,1)), sg.Text(key=TRIGGER_CHECK_RATE_CUR, text=f'{"Same as patience" if self.triggercheck is None else self.triggercheck}', text_color='light gray')], 
-            [sg.Text('Max patience', size=(15,1)), sg.InputText(key=MAX_PATIENCE, size=(15,1)), sg.Text(key=MAX_PATIENCE_CUR, text=self.max_patience, text_color='light gray')], 
-            [sg.Text('Max patience Stack', size=(15,1)), sg.InputText(key=MAX_PATIENCE_STACK, size=(15,1)), sg.Text(key=MAX_PATIENCE_STACK_CUR, text=self.queue.max_patience_stack, text_color='light gray')], 
-            [sg.Checkbox(default=self.CLICKGOLD, text='GOLD DIGGER', key=GOLD_DIGGER, size=(15,1)),sg.Text(key=GOLD_DIGGER_CUR, text=f'{"CLICKING GOLD!!!" if self.CLICKGOLD else "Nope.. T_T"}', text_color='light gray')], 
+            [sg.Text('Saves Dir', size=(text_width,1), tooltip='Directory to load and save data'), sg.InputText(key=SAVE_FOLDER, size=(15,1)), sg.Text(key=SAVE_FOLDER_CUR, text=self.saves_directory, text_color='light gray', auto_size_text=True)], 
+            [sg.Text('Target zone', size=(text_width,1), tooltip='Height and width (px) of the area used to check if target has triggered.'), sg.InputText(key=TARGET_ZONE, size=(15,1)), sg.Text(key=TARGET_ZONE_CUR, text=self.zone_size, text_color='light gray', auto_size_text=True)], 
+            [sg.Text('UI refresh', size=(text_width,1), tooltip='Delay (ms) between UI refresh while running.\nLow values can affect performances'), sg.InputText(key=UI_UPDATE, size=(15,1)), sg.Text(key=UI_UPDATE_CUR, text=self.UI_update_rate, text_color='light gray', auto_size_text=True)], 
+            [sg.Text('Trigger check rate', size=(text_width,1), tooltip='Delay (s) between trigger checks (Same as current patience level by default)\nLow values can affect performances'), sg.InputText(key=TRIGGER_CHECK_RATE, size=(15,1)), sg.Text(key=TRIGGER_CHECK_RATE_CUR, text=f'{"Same as patience" if self.triggercheck is None else self.triggercheck}', text_color='light gray', auto_size_text=True)], 
+            [sg.Text('Max patience', size=(text_width,1), tooltip='When using trackers, patience will prevent the clicker to simply click as soon as its triggered.\nEach newly triggered target add 1 stack. Each stack will take <<patience level>> sec to deplete.'), sg.InputText(key=MAX_PATIENCE, size=(15,1)), sg.Text(key=MAX_PATIENCE_CUR, text=self.max_patience, text_color='light gray', auto_size_text=True)], 
+            [sg.Text('Max patience Stack', size=(text_width,1), tooltip='Patience stack that would bring the queued up delay to exceed this value will be ignored.'), sg.InputText(key=MAX_PATIENCE_STACK, size=(15,1)), sg.Text(key=MAX_PATIENCE_STACK_CUR, text=self.queue.max_patience_stack, text_color='light gray', auto_size_text=True)], 
+            [sg.Checkbox(default=self.CLICKGOLD, text='GOLD DIGGER', key=GOLD_DIGGER, size=(text_width,1), tooltip='If selected, will periodically check and queue up golden cookies\n(For Cookie Clicker game)'),sg.Text(key=GOLD_DIGGER_CUR, text=f'{"CLICKING GOLD!!!" if self.CLICKGOLD else "Nope.. T_T"}', text_color='light gray', auto_size_text=True)], 
             [sg.Button(button_text='Update', key=SUBMIT_SETTINGS)]
             ]
 
@@ -228,7 +229,7 @@ class App:
 
         self.patience_slider = sg.Slider(range=(0, self.max_patience), default_value=5,
                 expand_x=True, enable_events=True,
-                orientation='horizontal', key=PATIENCE_SLIDER)
+                orientation='horizontal', key=PATIENCE_SLIDER, tooltip='Patience level\nWait increment for each newly triggered tracker')
 
         detailsFont = 'Terminal'
         track_tab=[
@@ -246,21 +247,20 @@ class App:
             [sg.Sizer(0,0)],
             details,
             [sg.Sizer(0,0)],
-            [sg.Sizer(0,0),self.target_table],
+            [self.target_table, sg.Sizer(0,0), ],
         ]
 
         bottom_row = [
-            sg.Button('CLICK!', key=CLICK_BTN, visible=True),
+            sg.Button(key=SAVE_BTN, button_text='SAVE', expand_x=True, expand_y=True),
             sg.VSeparator(),
-            sg.Button(key=SAVE_BTN, button_text='SAVE'),
-            sg.Button(key=LOAD_BTN, button_text='LOAD'),
-            sg.VSeparator(color=('black')),
-            sg.Button(key=LOAD_LAST_BTN, button_text='LAST'),
-            sg.Button(key=CLEAR_BTN, button_text='CLEAR'),
+            sg.Button(key=LOAD_BTN, button_text='LOAD', expand_x=True, expand_y=True),
+            sg.Button(key=LOAD_LAST_BTN, button_text='LAST', expand_x=True, expand_y=True),
             sg.VSeparator(),
-            sg.Button(key=TOGGLE_TRACK, button_text='Toggle Trackers'),
+            sg.Button(key=CLEAR_BTN, button_text='CLEAR', expand_x=True, expand_y=True),
             sg.VSeparator(),
-            sg.Button(key=TOGGLE_TABLE, button_text='Details'),
+            sg.Button(key=TOGGLE_TRACK, button_text='Toggle Trackers', expand_x=True, expand_y=True),
+            sg.VSeparator(),
+            sg.Button(key=TOGGLE_TABLE, button_text='Details', expand_x=True, expand_y=True),
         ]
         bottom_row_frame = [bottom_row]
 
@@ -275,9 +275,12 @@ class App:
             ]])],
             [sg.Sizer(0,0)],
         [
-            [sg.Frame('', bottom_row_frame, visible=True, key=BOTTOM_ROW_FRAME, expand_x=False), sg.Sizer(0,0)],
+            [sg.Frame('', bottom_row_frame, visible=True, key=BOTTOM_ROW_FRAME, expand_x=False, border_width=1), sg.Sizer(0,0)],
+            sg.Button('CLICK!', key=CLICK_BTN, visible=True, expand_x=True, expand_y=True)
+
         ]
         ]
+
         font = ("Arial", 12)
         # Create the window
         self.window = sg.Window("UltimateClicker", layout, location=(1100,100), font=font, element_justification='center')
@@ -458,7 +461,7 @@ class App:
             self.window[PATIENCE_PROGRESS_2].update(visible=self.running)
 
             self.window[BOTTOM_ROW_FRAME].update(visible= not self.running)
-            # self.window[NEXT_TARGET].update(visible=self.running)
+            self.window[CLICK_BTN].update(visible= not self.running)
             self.window[BIG_CPS].update(visible=self.running and self.queue.has_fast_target())
             self.window[BIG_TOTAL].update(visible=self.running and self.queue.has_fast_target())
             self.window[BIG_GOLD].update(visible=self.running and self.queue.CLICK_GOLDEN_COOKIES)
@@ -482,17 +485,17 @@ class App:
 
     def update_graphs(self):
         self.window[SELECTED_FRAME].update(visible=self.selected_target is not None and not self.running)
-        self.window[NEXT_FRAME].update(visible=self.running)
-        self.window[LAST_FRAME].update(visible=self.running)
+        self.window[NEXT_FRAME].update(visible=self.running and self.queue.has_tracker_targets())
+        self.window[LAST_FRAME].update(visible=self.running and self.queue.has_tracker_targets())
 
         if self.queue.last_click is None:
             self.graph_last.erase()
-        elif (self.last_target_drew is None or self.last_target_drew.targetid != self.queue.last_click):
+        elif (self.last_target_drew is None or self.last_target_drew != self.queue.last_click):
             self.draw_last()
 
         if self.queue.next_target is None:
             self.graph_next.erase()
-        elif (self.next_target_drew is None or self.next_target_drew[1].targetid != self.queue.next_target):
+        elif (self.next_target_drew is None or self.next_target_drew != self.queue.next_target):
             self.draw_next()
 
     def update_target_table(self):
@@ -800,6 +803,8 @@ class App:
                     time.sleep(0.5)
                     Thread(target=self.run_queue, daemon=True, name='RunQueue').start()
                     self.window[BOTTOM_ROW_FRAME].update(visible=False)
+                    self.window[CLICK_BTN].update(visible=False)
+
 
                 elif TARGET_TABLE in event:
                     try:
