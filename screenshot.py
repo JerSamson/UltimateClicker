@@ -31,8 +31,13 @@ def get_cookie_clicker_screenshot():
         ret, img = cv2.threshold(img, THRESHOLD_VALUE, 255, cv2.THRESH_BINARY)
         return img
 
-    title_pattern = re.compile(r"^.*cookies.*Cookie Clicker.*")
-    app = Application().connect(title_re=title_pattern)
+    try:
+        title_pattern = re.compile(r"^.*cookies.*Cookie Clicker.*")
+        app = Application().connect(title_re=title_pattern)
+    except:
+        print('ERROR - get_cookie_clicker_screenshot - Cookie clicker window not found')
+        return None
+    
     window = app.window(title_re=title_pattern)
     x, y, width, height = window.rectangle().left, window.rectangle(
     ).top, window.rectangle().width(), window.rectangle().height()
@@ -95,6 +100,10 @@ def SEEK_GOLDEN_COOKIES():
 
         # print("Mouse position is (", current_x, ",", current_y, ")")
         screenshot = get_cookie_clicker_screenshot()
+
+        if screenshot is None:
+            return None
+
         kp_reference, des_reference, img_reference = prepare_reference_image(
             reference_path)
         x, y = find_golden_cookie(screenshot, kp_reference,

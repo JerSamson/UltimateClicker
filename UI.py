@@ -32,6 +32,7 @@ CUR_IMAGE_KEY       ='-CURIMAGE-'
 OG_IMAGE_KEY        ='-OGIMAGE-'
 LAST_IMAGE_KEY      ='-LASTIMAGE-'
 NEXT_IMAGE_KEY      ='-NEXTIMAGE-'
+CPS_GRAPH           ='-CPSGRAPH-'
 TARGET_VSEP         ='-TARVSEP-'
 SELECTED_FRAME      ='-SELTARFRAME-'
 NEXT_FRAME          ='-NEXTTARFRAME-'
@@ -80,7 +81,8 @@ MAX_PATIENCE_CUR  = '-MAXPATIENCECUR-'
 MAX_PATIENCE_STACK      = '-MAXPATIENCESTACK-'
 MAX_PATIENCE_STACK_CUR  = '-MAXPATIENCESTACKCUR-'
 
-#TODO: Priority Queue
+MAX_CPS                 = '-MAXCPS-'
+MAX_CPS_CUR             = '-MAXCPSCUR-'
 
 def rgb_to_hex(r, g, b):
     return '#{:02x}{:02x}{:02x}'.format(r, g, b)
@@ -93,11 +95,8 @@ class App:
     def __init__(self) -> None:
 
         self.click_listener_thread = None
-        # self.track_ready_thread = Thread(target=self.track_ready, name='TrackReady')
-        # self.track_ready_thread_started = False
         self.setting_targets = False
         self.targets = []
-        # self.allowed_positions = []
         self.all_targets_ready = False
         self.mode = detectionMode.fast
 
@@ -122,6 +121,7 @@ class App:
         self.last_autosave = time.time()
         self.cur_x = 0
         self.cur_y = 0
+        self.max_cps_entry = 0
 
         # =========================== IDLE TAB ===========================
         idle_tab=[[sg.Text('IDLE',  size=(self.tab_size_x, self.tab_size_y))]]
@@ -138,6 +138,7 @@ class App:
             [sg.Text('Trigger check rate', size=(text_width,1), tooltip='Delay (s) between trigger checks (Same as current patience level by default)\nLow values can affect performances'), sg.InputText(key=TRIGGER_CHECK_RATE, size=(15,1)), sg.Text(key=TRIGGER_CHECK_RATE_CUR, text=f'{"Same as patience" if self.triggercheck is None else self.triggercheck}', text_color='light gray', auto_size_text=True)], 
             [sg.Text('Max patience', size=(text_width,1), tooltip='When using trackers, patience will prevent the clicker to simply click as soon as its triggered.\nEach newly triggered target add 1 stack. Each stack will take <<patience level>> sec to deplete.'), sg.InputText(key=MAX_PATIENCE, size=(15,1)), sg.Text(key=MAX_PATIENCE_CUR, text=self.max_patience, text_color='light gray', auto_size_text=True)], 
             [sg.Text('Max patience Stack', size=(text_width,1), tooltip='Patience stack that would bring the queued up delay to exceed this value will be ignored.'), sg.InputText(key=MAX_PATIENCE_STACK, size=(15,1)), sg.Text(key=MAX_PATIENCE_STACK_CUR, text=self.queue.max_patience_stack, text_color='light gray', auto_size_text=True)], 
+            [sg.Text('Target CPS', size=(text_width,1), tooltip='Limits CPS of fast trgets.'), sg.InputText(key=MAX_CPS, size=(15,1)), sg.Text(key=MAX_CPS_CUR, text=self.queue.target_cps, text_color='light gray', auto_size_text=True)], 
             [sg.Checkbox(default=self.CLICKGOLD, text='GOLD DIGGER', key=GOLD_DIGGER, size=(text_width,1), tooltip='If selected, will periodically check and queue up golden cookies\n(For Cookie Clicker game)'),sg.Text(key=GOLD_DIGGER_CUR, text=f'{"CLICKING GOLD!!!" if self.CLICKGOLD else "Nope.. T_T"}', text_color='light gray', auto_size_text=True)], 
             [sg.Button(button_text='Update', key=SUBMIT_SETTINGS)]
             ]
@@ -176,7 +177,6 @@ class App:
             sg.Sizer(0, 0),
             sg.Button('Set Targets', key=SET_TARGET_BTN, expand_x=True, expand_y=True),
             sg.Sizer(0, 0),
-            # sg.VSeparator(key=TARGET_VSEP),
             sg.Button('same', key=MODE_SAME_BTN, button_color = DISABLED_COLOR, visible=False, expand_x=True, expand_y=True),
             sg.Button('diff', key=MODE_DIFF_BTN, button_color = DISABLED_COLOR, visible=False, expand_x=True, expand_y=True),
             sg.Button('change', key=MODE_CHANGE_BTN, button_color = DISABLED_COLOR, visible=False, expand_x=True, expand_y=True),
@@ -209,12 +209,14 @@ class App:
                 expand_x=True, expand_y=True)
         
         # TODO
-        # self.graph_cps = sg.Graph(canvas_size=(IMAGE_SIZE_X*2, IMAGE_SIZE_Y*2),
-        #         graph_bottom_left=(-IMAGE_SIZE_X, -IMAGE_SIZE_Y),
-        #         graph_top_right=(IMAGE_SIZE_X, IMAGE_SIZE_Y),
-        #         enable_events=True,
-        #         drag_submits=False, key=NEXT_IMAGE_KEY,
-        #         expand_x=True, expand_y=True)
+        self.graph_cps = sg.Graph(canvas_size=(500, 100),
+                graph_bottom_left=(0, 0),
+                graph_top_right=(60, 1000),
+                enable_events=True,
+                drag_submits=False, key=CPS_GRAPH,
+                expand_x=False, expand_y=True,
+                background_color='white',
+                visible=False)
 
         last_frame = [self.graph_last]
         next_frame = [self.graph_next]
@@ -225,10 +227,6 @@ class App:
             sg.Frame('Last', [last_frame], visible=False, key=LAST_FRAME, expand_x=True),
             sg.Frame('Selected', [selected_frame], visible=False, key=SELECTED_FRAME, expand_x=True),
             ]
-
-        # selected=[
-        #     sg.Frame('Selected ref', [selected_frame, detail_txt], visible=False, key=SELECTED_FRAME)
-        # ]
 
         self.patience_slider = sg.Slider(range=(0, self.max_patience), default_value=5,
                 expand_x=True, enable_events=True,
@@ -242,6 +240,7 @@ class App:
             [sg.Sizer(0,0), sg.Text(key=BIG_TOTAL, visible=False, expand_x=True, expand_y=True, font=(detailsFont, 35), justification='center')],
             [sg.Sizer(0,0), sg.Text(key=BIG_CPS, visible=False, expand_x=True, expand_y=True, font=(detailsFont, 22), justification='center', text_color='gold')], #DAA520
             [sg.Sizer(0,0), sg.Text(key=BIG_GOLD, visible=False, expand_x=True, expand_y=True, font=(detailsFont, 16), justification='center', text_color='gold')],
+            [self.graph_cps, sg.Sizer(0,0)],
             [sg.Sizer(0,0)],
             [sg.Sizer(0,0), self.patience_slider],
             [sg.Sizer(0,0), sg.ProgressBar(self.queue.patience_level, orientation='h', expand_x=True, size=(20, 5),  key=PATIENCE_PROGRESS_2, visible=False, bar_color='blue')],
@@ -271,8 +270,6 @@ class App:
         layout = [
             [sg.Sizer(0,0)],
             [sg.TabGroup([[
-                # sg.Tab('idle', idle_tab),
-                # sg.Tab('fast', fast_tab),
                 sg.Tab('Track', track_tab,element_justification='center'),
                 sg.Tab('Settings', settings_tab,element_justification='left')
             ]])],
@@ -280,13 +277,45 @@ class App:
         [
             [sg.Frame('', bottom_row_frame, visible=True, key=BOTTOM_ROW_FRAME, expand_x=False, border_width=1), sg.Sizer(0,0)],
             sg.Button('CLICK!', key=CLICK_BTN, visible=True, expand_x=True, expand_y=True)
-
         ]
         ]
 
         font = ("Arial", 12)
+
         # Create the window
         self.window = sg.Window("UltimateClicker", layout, location=(1100,100), font=font, element_justification='center')
+
+    def update_cps_graph(self):
+        if self.queue.has_fast_target() and self.running:
+            if not self.graph_cps.visible:
+                self.window[CPS_GRAPH].update(visible = True)
+
+            if len(self.queue.fast_target.cps_history) <= 0: # No Data yet
+                self.graph_cps.erase()
+                return
+
+            last_x = 0
+            last_y = 0
+
+            max_cps_entry = max(self.queue.fast_target.cps_history)
+            max_cps_entry = max([max_cps_entry, self.queue.fast_target.target_cps])
+            self.graph_cps.TopRight = (60, max_cps_entry+50)
+
+            if max_cps_entry > self.max_cps_entry:
+                self.max_cps_entry = max_cps_entry
+
+            self.graph_cps.erase()
+            if self.queue.fast_target.target_cps > 0: # Draw target line
+                self.graph_cps.draw_line((0, self.queue.fast_target.target_cps), (60, self.queue.fast_target.target_cps))
+
+            if len(self.queue.fast_target.cps_history) > 1:
+                last_y = self.queue.fast_target.cps_history[0]
+
+            for entry in self.queue.fast_target.cps_history:
+                next_x = last_x + 1
+                self.graph_cps.draw_line((last_x, last_y), (next_x, entry), color='red', width=2)
+                last_x = next_x
+                last_y = entry
 
     def display_current(self):
         self.graph_cur.erase()
@@ -359,6 +388,7 @@ class App:
     def load_targets(self, save_file):
         print(f'INFO - load_targets - Loading targets from {save_file}')
         try:
+            save_has_gold = False
             self.queue.clear_targets()
             file_path = self.cwd + self.saves_directory + save_file
             with open(file_path, 'r') as file:
@@ -376,15 +406,19 @@ class App:
                         tar = IdleTarget(int(row[1]), int(row[2]))
                     elif typ == 'GOLD':
                         if row[1].isdigit():
+                            save_has_gold = True
                             self.queue.golden_clicked = int(row[1])
 
                     if tar is not None:
                         try: tar.times_clicked = int(row[4]) 
                         except: pass
                         self.add_target(tar, False)
+
+                if not save_has_gold:
+                    self.queue.golden_clicked = 0
+
         except Exception as e:
             print(f'Could not load targets from "{save_file}" ({e})')
-            # self.track_ready_thread.join()
 
     def save_targets(self, save_file):
         if len(self.targets) == 0:
@@ -397,6 +431,8 @@ class App:
                 for tar in self.targets:
                     writer.writerow(tar.to_csv())
                 writer.writerow(['GOLD', self.queue.golden_clicked])
+            print(f'INFO - save_targets - Targets saved to {save_file}')
+            
         except Exception as e:
             print(f'Could not save files to "{save_file}" ({e})')
 
@@ -440,6 +476,7 @@ class App:
             if tar.is_ready():
                 i+=1
         return i
+    
     def are_targets_ready(self):
         for tar in self.targets:
             if not tar.is_ready():
@@ -468,6 +505,7 @@ class App:
             self.window[CLICK_BTN].update(visible= not self.running)
             self.window[BIG_CPS].update(visible=self.running and self.queue.has_fast_target())
             self.window[BIG_TOTAL].update(visible=self.running and self.queue.has_fast_target())
+            self.window[CPS_GRAPH].update(visible=self.running and self.queue.has_fast_target())
             self.window[BIG_GOLD].update(visible=self.running and self.queue.CLICK_GOLDEN_COOKIES)
 
             Thread(target=self.update_cursor, name='UpdateCursor').start()
@@ -538,6 +576,7 @@ class App:
             self.window[BIG_CPS].update(value=f'{int(self.queue.fast_target.cps)} CPS ({int(self.queue.fast_target.avg_cps)} avg)')
             self.window[BIG_TOTAL].update(value=f'{millify(self.queue.fast_target.times_clicked)}')
             self.window[BIG_GOLD].update(value=f'{self.queue.golden_clicked} Golden Cookie{"s" if self.queue.golden_clicked > 1 else ""}')
+            self.update_cps_graph()
         else:
             self.window[BIG_CPS].update(visible=False)
             self.window[BIG_TOTAL].update(visible=False)
@@ -551,6 +590,7 @@ class App:
         x_outside = x < winPos_acc[0] or x > winPos[0] + winSize[0]
         y_outside = y < winPos_acc[1] or y > winPos[1] + winSize[1]
         return not x_outside and not y_outside
+    
 # =-=-=-=-= CALLBACKS =-=-=-=-=
     def on_move(self, x, y):
         if self.setting_targets:
@@ -624,7 +664,6 @@ class App:
         self.queue.has_update = True
         print('INFO - UI.track_ready() thread finished')
 
-        return
         # self.window[CLICK_BTN].update(text='Click!')
 
     def update_patience_slider(self):
@@ -652,6 +691,8 @@ class App:
         self.running = True
         self.aborted = False
         self.update_buttons()
+        
+        self.graph_cps.erase()
 
         if self.triggercheck is not None:
             self.queue.triggercheck = self.triggercheck
@@ -677,7 +718,6 @@ class App:
         
         self.queue.add_target(tar)
         self.targets = self.queue.targets
-        # self.allowed_positions = [(tar.x, tar.y) for tar in self.targets]
         if track:
             Thread(target=self.track_ready, name='TrackReady').start()
 
@@ -740,18 +780,28 @@ class App:
             else:
                 print(f'WARN - invalid max patience value ({value})')
 
+        value = values[MAX_CPS]
+        if value != '':
+            if value.isdigit() and int(value) >= 0:
+                self.queue.target_cps = int(value)
+                self.window[MAX_CPS_CUR].update(value=self.queue.target_cps)
+            else:
+                print(f'WARN - invalid Target cps value ({value})')
+
     def run(self):
         try:
-            print('INFO - UI.run_queue() thread finished')
+            print('INFO - UI.run() Started')
             # Create an event loop
             self.click_listener_thread = Listener(on_move=self.on_move, on_click=self.on_click, on_scroll=self.on_scroll)
             self.click_listener_thread.name='ClickListener'
             self.click_listener_thread.start()
+
             while True:
                 timeout = 1000 if not self.running else self.UI_update_rate
                 event, values = self.window.read(timeout=timeout, timeout_key='NA')
                 if event != 'NA':
                     print(f'INFO - UI.run() - Handling event [{event}]')
+
                 # End program if user closes window or
                 # presses the OK button
                 if event in [sg.WIN_CLOSED, 'CLOSE', 'OK']:
@@ -760,7 +810,6 @@ class App:
                 if self.queue.has_update:
                     self.queue.has_update = False
                     self.targets = self.queue.targets
-                    # self.allowed_positions = [(tar.x, tar.y) for tar in self.targets]
 
                 if self.running and self.autosave_freq > 0 and time.time() - self.last_autosave >= self.autosave_freq*60:
                     print(f'INFO - UI.run() - Automatic save (Set for every {self.autosave_freq} minutes)')
@@ -854,18 +903,15 @@ class App:
             self.click_listener_thread.join()
             self.window.close()
             raise e
+        finally:
+            print('INFO - UI.run() Finished')
+
+        
 if __name__ == '__main__':
     try:
         app = App()
         app.run()
-        # mouse = Controller()
-        # one = time.time_ns()
-        # for i in range(200):
-        #     mouse.click(Button.left)
 
-        # two = time.time_ns()
-
-        # print(f'{int((two-one)/1000000)}ms')
     except Exception as e:
         raise e
     finally:

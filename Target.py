@@ -14,6 +14,7 @@ from pynput.mouse import Button, Controller
 from pynput.mouse import Controller, Button
 from DetectionMode import detectionMode
 from RepeatedTimer import RepeatedTimer
+from simple_pid import PID
 
 from numba import jit, cuda 
 import numpy as np 
@@ -165,14 +166,17 @@ class FastTarget(BaseTarget):
         self.avg_cps      = 0
         self.n_cps_sample = 0
         self.highest_cps  = 0
-
+        self.target_cps   = 0
+        self.last_handle  = time.time()
         self.last_nb_clicks = 0
+        self.cps_history    = []
+        self.pid = PID(-0.00000025, -0.000025, 0, output_limits=(0,1))
 
         # self.nb_clicks_theo = 0
         # self.last_nb_clicks_theo = 0
         self.get_ref_area()
         self.last_cps_time = 0
-        self.cps_compute_freq = 1
+        self.cps_compute_freq = 0.33
         self.start_time       = time.time()
 
     def approxCpsAverage(self, new_sample):
@@ -199,6 +203,9 @@ class FastTarget(BaseTarget):
     def click(self):
         if self.first_click_time == 0:
             self.first_click_time = time.time()
+            if self.target_cps > 0:
+                self.pid.setpoint = self.target_cps
+                self.pid.output_limits = (0.5/self.target_cps, 1)
         # self.nb_clicks = self.nb_clicks + 1
         return super().click()
 
@@ -226,6 +233,7 @@ class FastTarget(BaseTarget):
         self.avg_cps = 0
         self.n_cps_sample = 0
         self.first_click_time = 0
+        self.cps_history.clear()
         return super().stop()
     
     def start(self):
@@ -233,6 +241,7 @@ class FastTarget(BaseTarget):
         self.avg_cps = 0
         self.n_cps_sample = 0
         self.first_click_time = 0
+        self.cps_history.clear()
         return super().start()
 
     def info(self):
@@ -255,11 +264,15 @@ class FastTarget(BaseTarget):
 
     def handle(self):
         if self.active:
+
             self.click()
-            # time.sleep(self.delay)
+
             if time.time() - self.last_cps_time > self.cps_compute_freq:
                 self.update_cps()
                 # self.tweak_delay()
+
+            self.last_handle = time.time()
+
             return True
         else:
             return False
@@ -275,9 +288,15 @@ class FastTarget(BaseTarget):
             return
         
         now = time.time()
-        self.cps = (self.times_clicked - self.last_nb_clicks)/(now - self.last_cps_time)
+        self.cps = math.ceil((self.times_clicked - self.last_nb_clicks)/(now - self.last_cps_time))
         self.last_cps_time = now
         self.last_nb_clicks= self.times_clicked
+
+        if len(self.cps_history) < 60:
+            self.cps_history.append(self.cps)
+        else:
+            self.cps_history.pop(0)
+            self.cps_history.append(self.cps)
 
         if self.cps > self.highest_cps:
             self.highest_cps = self.cps
@@ -285,6 +304,12 @@ class FastTarget(BaseTarget):
 
         if self.times_clicked > 100:
             self.approxCpsAverage(self.cps)
+        
+        if self.target_cps > 0:
+            self.delay = self.pid(self.cps)
+            # self.delay += delay_tweak
+            print(f"DEBUG - PID - NewVal:{self.delay}")
+
         # self.tweak_delay()
 
 
@@ -305,6 +330,7 @@ class TrackerTarget(BaseTarget):
         self.last_color_trigger = None
         self.delay_after_handle_2_trigger = 1
         self.tolerance = 5
+
     def to_csv(self):
         return ['Tracker', self.x, self.y, int(self.mode), self.times_clicked]
 
@@ -362,7 +388,6 @@ class TrackerTarget(BaseTarget):
         self.acquired = False
         Thread(target=self.color_acquisition, daemon=True, name='bg_color_acquisition').start()
 
-    # @jit(target_backend='cuda', forceobj=True)
     def check_trigger(self):
 
         if time.time() - self.last_handle < self.delay_after_handle_2_trigger:
@@ -439,28 +464,16 @@ class GOLDENTARGET(BaseTarget):
 
     def get_priority(self):
         return -999
+    
     def is_ready(self):
         return True
+    
     def check_trigger(self):
         return True
+    
     def handle(self):
         self.single_shot_triggered = True
         win32api.SetCursorPos((self.x,self.y))
         self.mouse.click(button=Button.left)
         self.times_clicked+=1
         self.handled = True
-
-    # def __init__(self, x, y, zone_area, mode, mindist=0, info_freq=False, active=False):
-    #     super().__init__(x, y, zone_area, mode, mindist, info_freq, active) 
-    #     self.priority_mode = 'AlwaysTop'
-    #     self.single_shot_triggered = False
-
-    # def get_priority(self):
-    #     return -999
-    # def is_ready(self):
-    #     return True
-    # def check_trigger(self):
-    #     return True
-    # def handle(self):
-    #     self.single_shot_triggered = True
-    #     return super().handle()

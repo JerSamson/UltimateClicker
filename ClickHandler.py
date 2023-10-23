@@ -1,10 +1,9 @@
 from Target import *
 from threading import Lock, Thread
 import time
-from RepeatedTimer import RepeatedTimer
-import ctypes
 from ClickQueue import *
 from screenshot import SEEK_GOLDEN_COOKIES
+from simple_pid import PID
 # def ctype_async_raise(target_tid, exception):
 #     ret = ctypes.pythonapi.PyThreadState_SetAsyncExc(ctypes.c_long(target_tid), ctypes.py_object(exception))
 #     # ref: http://docs.python.org/c-api/init.html#PyThreadState_SetAsyncExc
@@ -53,6 +52,7 @@ class ClickHandler:
         self.CLICK_GOLDEN_COOKIES = True
         self.last_golden_cookie_pos = None
         self.golden_clicked = 0
+        self.target_cps = 0
 
     def get_allowed_positions(self):
         #MaybeLock
@@ -165,6 +165,9 @@ class ClickHandler:
                 else:
                     potentials_targets[i].enabled = False
 
+        if self.fast_target is not None and self.target_cps >= 0:
+            self.fast_target.target_cps = self.target_cps
+
         if current is not self.fast_target:
             self.has_update = True
 
@@ -276,6 +279,16 @@ class ClickHandler:
         print('INFO - ClickHandler.fast_click_thread() thread started')
         while self.running:
             self.handle_task(self.fast_target)
+
+            if self.fast_target.target_cps > 0 and self.fast_target.last_handle > 0:
+                time.sleep(self.fast_target.delay)
+                # delay = (1/self.fast_target.target_cps) - (time.time() - self.fast_target.last_handle)
+            #     if delay > 0:
+            #         print(f'INFO - Waiting {round(delay, 2)}s to limit cps to {self.fast_target.target_cps}')
+            #         self.wait(delay)
+            # else:
+            #     time.sleep(self.fast_target.delay)
+
             if not self.running: break
         print('INFO - ClickHandler.fast_click_thread() thread finished')
 
@@ -382,6 +395,8 @@ class ClickHandler:
             if self.patience_level <= 0:
                 self.impatientThread = Thread(target=self.impatient_thread, daemon=True)
                 self.impatientThread.start()
+
+        # RUNNING
 
         if self.has_fast_target():
             self.fast_thread.join()

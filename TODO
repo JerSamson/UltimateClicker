@@ -1,0 +1,34 @@
+Parameter to limit max CPS
+Delete save
+Auto save to specified file instead of default 'auto_save'
+
+Instead of checking individual tracker target zones for triggers, to save computing power: 
+    - Take a screenshot of the whole screen / game
+    - Check every target using the same picture (Optional arg)
+
+- Possibility of specifying a specific window for a target? 
+    (Like the regex used in screenshot.get_cookie_clicker_screenshot)
+
+Ability to move the position of an existing target
+
+Real-Time cps graph
+
+
+Simple GUI for only fast clicking in a separate tab
+
+
+Idle targets implementation
+
+
+* Improve impatient mode performances
+    events instead of update_trigger?
+
+
+Setting class (xml?)
+    - Default settings
+    - Ability to change default settings
+    - setting_entry subclass
+        Tooltip
+        Type (Bool, Int, Float...)
+        Validation
+        *Same instance could be shared between classes
