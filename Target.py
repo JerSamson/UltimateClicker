@@ -15,6 +15,8 @@ from pynput.mouse import Controller, Button
 from DetectionMode import detectionMode
 from RepeatedTimer import RepeatedTimer
 from simple_pid import PID
+from event_graph import EventGraph, CpsEntry
+
 
 from numba import jit, cuda
 import numpy as np
@@ -176,6 +178,8 @@ class FastTarget(BaseTarget):
         self.last_cps_time = 0
         self.cps_compute_freq = 0.1
         self.start_time       = time.time()
+        self.eventgraph = EventGraph()
+
         self.get_ref_area()
 
     def approxCpsAverage(self, new_sample):
@@ -240,6 +244,7 @@ class FastTarget(BaseTarget):
         self.avg_cps = 0
         self.n_cps_sample = 0
         self.first_click_time = 0
+        self.eventgraph.target_cps = self.target_cps
         self.cps_history.clear()
         return super().start()
 
@@ -310,8 +315,10 @@ class FastTarget(BaseTarget):
             self.cps_history.pop(0)
             for entry in self.cps_history:
                 entry[0] = self.normalize_timestamp(entry[2])
+        
+        self.eventgraph.add_entry(CpsEntry(now, self.cps))
 
-        self.cps_history.append([relative_timestamp, self.cps, actual_timestamp])
+        # self.cps_history.append([relative_timestamp, self.cps, actual_timestamp])
 
         if self.cps > self.highest_cps:
             self.highest_cps = self.cps

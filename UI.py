@@ -8,6 +8,9 @@ from Target import *
 import cursor
 import csv
 import os 
+
+from event_graph import *
+
 pyautogui.PAUSE = 0
 
 millnames = ['',' Thousand',' Million',' Billion',' Trillion']
@@ -32,7 +35,7 @@ CUR_IMAGE_KEY       ='-CURIMAGE-'
 OG_IMAGE_KEY        ='-OGIMAGE-'
 LAST_IMAGE_KEY      ='-LASTIMAGE-'
 NEXT_IMAGE_KEY      ='-NEXTIMAGE-'
-CPS_GRAPH           ='-CPSGRAPH-'
+EVENT_GRAPH         ='-EVENTGRAPH-'
 TARGET_VSEP         ='-TARVSEP-'
 SELECTED_FRAME      ='-SELTARFRAME-'
 NEXT_FRAME          ='-NEXTTARFRAME-'
@@ -126,6 +129,8 @@ class App:
         self.cur_y = 0
         self.max_cps_entry = 0
 
+        self.eventgraph = EventGraph(EVENT_GRAPH)  
+
         # =========================== IDLE TAB ===========================
         idle_tab=[[sg.Text('IDLE',  size=(self.tab_size_x, self.tab_size_y))]]
 
@@ -149,7 +154,6 @@ class App:
 
         # =========================== RIGHT CLICK MENU ===========================
         self.right_click_menu = ['&Right', ['Delete', 'Toggle']]
-
 
 
         # =========================== TRACKER TAB ===========================
@@ -213,14 +217,14 @@ class App:
                 expand_x=True, expand_y=True)
         
         # TODO
-        self.graph_cps = sg.Graph(canvas_size=(500, 100),
-                graph_bottom_left=(0, 0),
-                graph_top_right=(60, 1000),
-                enable_events=True,
-                drag_submits=False, key=CPS_GRAPH,
-                expand_x=False, expand_y=True,
-                background_color='white',
-                visible=False)
+        # self.graph_cps = sg.Graph(canvas_size=(500, 100),
+        #         graph_bottom_left=(0, 0),
+        #         graph_top_right=(60, 1000),
+        #         enable_events=True,
+        #         drag_submits=False, key=EVENT_GRAPH,
+        #         expand_x=False, expand_y=True,
+        #         background_color='white',
+        #         visible=False)
 
         last_frame = [self.graph_last]
         next_frame = [self.graph_next]
@@ -244,7 +248,7 @@ class App:
             [sg.Sizer(0,0), sg.Text(key=BIG_TOTAL, visible=False, expand_x=True, expand_y=True, font=(detailsFont, 35), justification='center')],
             [sg.Sizer(0,0), sg.Text(key=BIG_CPS, visible=False, expand_x=True, expand_y=True, font=(detailsFont, 22), justification='center', text_color='gold')], #DAA520
             [sg.Sizer(0,0), sg.Text(key=BIG_GOLD, visible=False, expand_x=True, expand_y=True, font=(detailsFont, 16), justification='center', text_color='gold')],
-            [self.graph_cps, sg.Sizer(0,0)],
+            [self.eventgraph.graph, sg.Sizer(0,0)],
             [sg.Sizer(0,0)],
             [sg.Sizer(0,0), self.patience_slider],
             [sg.Sizer(0,0), sg.ProgressBar(self.queue.patience_level, orientation='h', expand_x=True, size=(20, 5),  key=PATIENCE_PROGRESS_2, visible=False, bar_color='blue')],
@@ -289,65 +293,66 @@ class App:
         # Create the window
         self.window = sg.Window("UltimateClicker", layout, location=(1100,100), font=font, element_justification='center')
 
-    def update_cps_graph(self):
-        if self.queue.has_fast_target() and self.running:
-            target = self.queue.fast_target
+    def update_event_graph(self):
+        self.eventgraph.update()
+        # self.graph_cps.erase()
+        # if self.queue.has_fast_target() and self.running:
+        #     target = self.queue.fast_target
             
-            if not self.graph_cps.visible:
-                self.window[CPS_GRAPH].update(visible = True)
+        #     if not self.graph_cps.visible:
+        #         self.window[EVENT_GRAPH].update(visible = True)
 
-            if len(target.cps_history) <= 0: # No Data yet
-                self.graph_cps.erase()
-                return
+        #     if len(target.cps_history) <= 0: # No Data yet
+        #         self.graph_cps.erase()
+        #         return
 
-            last_x = 0
-            last_y = 0
+        #     last_x = 0
+        #     last_y = 0
 
-            max_cps_entry = max([entry[1] for entry in target.cps_history])
-            max_cps_entry = max([max_cps_entry, target.target_cps])
+        #     max_cps_entry = max([entry[1] for entry in target.cps_history])
+        #     max_cps_entry = max([max_cps_entry, target.target_cps])
 
-            max_cps_timestamp = max([entry[0] for entry in target.cps_history])
-            min_cps_timestamp = min([entry[0] for entry in target.cps_history])
+        #     max_cps_timestamp = max([entry[0] for entry in target.cps_history])
+        #     min_cps_timestamp = min([entry[0] for entry in target.cps_history])
 
-            bottom_left_x = min_cps_timestamp
-            bottom_left_y = 0
-            bottom_left = (bottom_left_x, bottom_left_y)
+        #     bottom_left_x = min_cps_timestamp
+        #     bottom_left_y = 0
+        #     bottom_left = (bottom_left_x, bottom_left_y)
 
-            top_right_y = max_cps_entry + 50
-            top_right_x = max_cps_timestamp
-            top_right = (top_right_x, top_right_y)
+        #     top_right_y = max_cps_entry + 50
+        #     top_right_x = max_cps_timestamp
+        #     top_right = (top_right_x, top_right_y)
 
-            self.graph_cps.BottomLeft = bottom_left
-            self.graph_cps.TopRight = top_right
+        #     self.graph_cps.BottomLeft = bottom_left
+        #     self.graph_cps.TopRight = top_right
 
-            # print(f'INFO - CPS_GRAPH - Graph boundaries: {bottom_left} - {top_right}')
+        #     # print(f'INFO - EVENT_GRAPH - Graph boundaries: {bottom_left} - {top_right}')
 
-            if max_cps_entry > self.max_cps_entry:
-                self.max_cps_entry = max_cps_entry
+        #     if max_cps_entry > self.max_cps_entry:
+        #         self.max_cps_entry = max_cps_entry
 
-            self.graph_cps.erase()
-            if self.queue.fast_target.target_cps > 0: # Draw target line
-                self.graph_cps.draw_line((0, target.target_cps), (top_right_x, target.target_cps))
+        #     if self.queue.fast_target.target_cps > 0: # Draw target line
+        #         self.graph_cps.draw_line((0, target.target_cps), (top_right_x, target.target_cps))
 
-            if len(self.queue.fast_target.cps_history) > 1:
-                last_y = target.cps_history[0][1]
+        #     if len(self.queue.fast_target.cps_history) > 1:
+        #         last_y = target.cps_history[0][1]
 
-            for entry in self.queue.fast_target.cps_history:
-                # print(f'INFO - CPSGRAPH - New line from ({last_x},{last_y}) to {entry}')
-                self.graph_cps.draw_line((last_x, last_y), (entry[0], entry[1]), color='red', width=2)
-                last_x = entry[0]
-                last_y = entry[1]
+        #     for entry in self.queue.fast_target.cps_history:
+        #         # print(f'INFO - CPSGRAPH - New line from ({last_x},{last_y}) to {entry}')
+        #         self.graph_cps.draw_line((last_x, last_y), (entry[0], entry[1]), color='red', width=2)
+        #         last_x = entry[0]
+        #         last_y = entry[1]
 
-            event_colors = {
-                'update_thread' :   'blue',
-                'GoldenCookie'  :   'gold',
-                'HandleOne'     :   'green'
-            }
-            for entry in self.queue.event_history:
-                normalized_entry = self.queue.fast_target.normalize_timestamp(entry[0])
-                color = event_colors[entry[1]]
-                if normalized_entry > bottom_left_x and normalized_entry < top_right_x:
-                    self.graph_cps.draw_line((normalized_entry, bottom_left_y), (normalized_entry, top_right_y), color=color, width=2)
+        #     event_colors = {
+        #         'update_thread' :   'blue',
+        #         'GoldenCookie'  :   'gold',
+        #         'HandleOne'     :   'green'
+        #     }
+        #     for entry in self.queue.event_history:
+        #         normalized_entry = self.queue.fast_target.normalize_timestamp(entry[0])
+        #         color = event_colors[entry[1]]
+        #         if normalized_entry > bottom_left_x and normalized_entry < top_right_x:
+        #             self.graph_cps.draw_line((normalized_entry, bottom_left_y), (normalized_entry, top_right_y), color=color, width=2)
 
 
     def display_current(self):
@@ -538,7 +543,7 @@ class App:
             self.window[CLICK_BTN].update(visible= not self.running)
             self.window[BIG_CPS].update(visible=self.running and self.queue.has_fast_target())
             self.window[BIG_TOTAL].update(visible=self.running and self.queue.has_fast_target())
-            self.window[CPS_GRAPH].update(visible=self.running and self.queue.has_fast_target())
+            self.window[EVENT_GRAPH].update(visible=self.running)# and self.queue.has_fast_target())
             self.window[BIG_GOLD].update(visible=self.running and self.queue.CLICK_GOLDEN_COOKIES)
 
             Thread(target=self.update_cursor, name='UpdateCursor').start()
@@ -609,11 +614,11 @@ class App:
             self.window[BIG_CPS].update(value=f'{int(self.queue.fast_target.cps)} CPS ({int(self.queue.fast_target.avg_cps)} avg)')
             self.window[BIG_TOTAL].update(value=f'{millify(self.queue.fast_target.times_clicked)}')
             self.window[BIG_GOLD].update(value=f'{self.queue.golden_clicked} Golden Cookie{"s" if self.queue.golden_clicked > 1 else ""}')
-            self.update_cps_graph()
         else:
             self.window[BIG_CPS].update(visible=False)
             self.window[BIG_TOTAL].update(visible=False)
 
+        self.update_event_graph()
         self.window[BIG_GOLD].update(visible=self.running and self.queue.CLICK_GOLDEN_COOKIES)
 
     def is_click_inside_app(self, x, y):
@@ -725,7 +730,7 @@ class App:
         self.aborted = False
         self.update_buttons()
         
-        self.graph_cps.erase()
+        # self.eventgraph.erase()
 
         if self.triggercheck is not None:
             self.queue.triggercheck = self.triggercheck
@@ -781,7 +786,7 @@ class App:
 
         value = values[TRIGGER_CHECK_RATE]
         if value != '':
-            if value.isdigit() and int(value) > 1:
+            if value.isdigit() and int(value) >= 1:
                 self.triggercheck = int(value)
                 self.window[TRIGGER_CHECK_RATE_CUR].update(value=self.triggercheck)
             else:
@@ -823,8 +828,9 @@ class App:
 
         value = values[CPS_UPDATE]
         if value != '':
-            if value.isdigit() and int(value) >= 0:
-                self.queue.cps_update = int(value)
+            if value.replace('.','',1).isdigit() and float(value) >= 0:
+                self.queue.cps_update = float(value)
+                self.eventgraph.target_cps = float(value)
                 self.window[CPS_UPDATE_CUR].update(value=self.queue.cps_update)
             else:
                 print(f'WARN - invalid Target cps value ({value})')

@@ -3,7 +3,8 @@ from threading import Lock, Thread
 import time
 from ClickQueue import *
 from screenshot import SEEK_GOLDEN_COOKIES
-from simple_pid import PID
+from event_graph import EventGraph, EventEntry
+
 # def ctype_async_raise(target_tid, exception):
 #     ret = ctypes.pythonapi.PyThreadState_SetAsyncExc(ctypes.c_long(target_tid), ctypes.py_object(exception))
 #     # ref: http://docs.python.org/c-api/init.html#PyThreadState_SetAsyncExc
@@ -55,6 +56,7 @@ class ClickHandler:
         self.target_cps = 0
         self.event_history = []
         self.cps_update = 0.5
+        self.eventgraph = EventGraph()
 
     def get_allowed_positions(self):
         #MaybeLock
@@ -111,7 +113,7 @@ class ClickHandler:
     def stop(self):
         self.running = False
         self.handling_one = False
-        self.event_history.clear()
+        self.eventgraph.clear_entries()
         for tar in self.targets:
             tar.stop()
         self.click_queue.empty_queue()
@@ -127,7 +129,7 @@ class ClickHandler:
         
         self.running = True
 
-        self.event_history.clear()
+        self.eventgraph.clear_entries()
         for tar in self.targets:
             tar.start()
 
@@ -172,7 +174,7 @@ class ClickHandler:
             if self.target_cps >= 0:
                 self.fast_target.target_cps = self.target_cps
             self.fast_target.cps_compute_freq = self.cps_update
-            
+
         if current is not self.fast_target:
             self.has_update = True
 
@@ -229,21 +231,22 @@ class ClickHandler:
 
         self.waiting = False
         self.has_update = True
-        print('INFO - Done waiting.')
+        print('INFO - ClickHandler.wait_additionnal_time() - Done waiting.')
         return True
     
     def add_event_entry(self, name):
         ts = time.time()
-        print(f'INFO - Add_event_entry - Adding entry at timestamp {ts}')
-        self.event_history.append((ts, name))
+        print(f'INFO - ClickHandler.Add_event_entry - Adding entry at timestamp {round(ts,2)}')
+        self.eventgraph.add_entry(EventEntry(ts, name))
+
+        # self.event_history.append((ts, name))
 
     def update_thread(self, patient=True):
         print('INFO - ClickHandler.update_thread() thread started')
 
         while self.running:
             try:
-                if self.has_fast_target():
-                    self.add_event_entry('update_thread')
+                self.add_event_entry('update_thread')
                 print('INFO - ClickHandler.update_thread() looped')
                 for tar in self.targets:
                     if not isinstance(tar, FastTarget) and tar.enabled and tar.check_trigger():
