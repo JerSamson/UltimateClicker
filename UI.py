@@ -84,6 +84,9 @@ MAX_PATIENCE_STACK_CUR  = '-MAXPATIENCESTACKCUR-'
 MAX_CPS                 = '-MAXCPS-'
 MAX_CPS_CUR             = '-MAXCPSCUR-'
 
+CPS_UPDATE                 = '-CPSUPDATE-'
+CPS_UPDATE_CUR             = '-CPSUPDATECUR-'
+
 def rgb_to_hex(r, g, b):
     return '#{:02x}{:02x}{:02x}'.format(r, g, b)
 
@@ -113,7 +116,7 @@ class App:
         self.queue = ClickHandler()
         self.triggercheck = None
         self.UI_update_rate = 100
-        self.CLICKGOLD = True
+        self.CLICKGOLD = False
         self.max_patience = 20
         self.tab_size_x = 50
         self.tab_size_y = 1
@@ -139,6 +142,7 @@ class App:
             [sg.Text('Max patience', size=(text_width,1), tooltip='When using trackers, patience will prevent the clicker to simply click as soon as its triggered.\nEach newly triggered target add 1 stack. Each stack will take <<patience level>> sec to deplete.'), sg.InputText(key=MAX_PATIENCE, size=(15,1)), sg.Text(key=MAX_PATIENCE_CUR, text=self.max_patience, text_color='light gray', auto_size_text=True)], 
             [sg.Text('Max patience Stack', size=(text_width,1), tooltip='Patience stack that would bring the queued up delay to exceed this value will be ignored.'), sg.InputText(key=MAX_PATIENCE_STACK, size=(15,1)), sg.Text(key=MAX_PATIENCE_STACK_CUR, text=self.queue.max_patience_stack, text_color='light gray', auto_size_text=True)], 
             [sg.Text('Target CPS', size=(text_width,1), tooltip='Limits CPS of fast trgets.'), sg.InputText(key=MAX_CPS, size=(15,1)), sg.Text(key=MAX_CPS_CUR, text=self.queue.target_cps, text_color='light gray', auto_size_text=True)], 
+            [sg.Text('CPS Update Delay', size=(text_width,1), tooltip='Delay between cps update (fast targets).'), sg.InputText(key=CPS_UPDATE, size=(15,1)), sg.Text(key=CPS_UPDATE_CUR, text=self.queue.cps_update, text_color='light gray', auto_size_text=True)], 
             [sg.Checkbox(default=self.CLICKGOLD, text='GOLD DIGGER', key=GOLD_DIGGER, size=(text_width,1), tooltip='If selected, will periodically check and queue up golden cookies\n(For Cookie Clicker game)'),sg.Text(key=GOLD_DIGGER_CUR, text=f'{"CLICKING GOLD!!!" if self.CLICKGOLD else "Nope.. T_T"}', text_color='light gray', auto_size_text=True)], 
             [sg.Button(button_text='Update', key=SUBMIT_SETTINGS)]
             ]
@@ -287,35 +291,64 @@ class App:
 
     def update_cps_graph(self):
         if self.queue.has_fast_target() and self.running:
+            target = self.queue.fast_target
+            
             if not self.graph_cps.visible:
                 self.window[CPS_GRAPH].update(visible = True)
 
-            if len(self.queue.fast_target.cps_history) <= 0: # No Data yet
+            if len(target.cps_history) <= 0: # No Data yet
                 self.graph_cps.erase()
                 return
 
             last_x = 0
             last_y = 0
 
-            max_cps_entry = max(self.queue.fast_target.cps_history)
-            max_cps_entry = max([max_cps_entry, self.queue.fast_target.target_cps])
-            self.graph_cps.TopRight = (60, max_cps_entry+50)
+            max_cps_entry = max([entry[1] for entry in target.cps_history])
+            max_cps_entry = max([max_cps_entry, target.target_cps])
+
+            max_cps_timestamp = max([entry[0] for entry in target.cps_history])
+            min_cps_timestamp = min([entry[0] for entry in target.cps_history])
+
+            bottom_left_x = min_cps_timestamp
+            bottom_left_y = 0
+            bottom_left = (bottom_left_x, bottom_left_y)
+
+            top_right_y = max_cps_entry + 50
+            top_right_x = max_cps_timestamp
+            top_right = (top_right_x, top_right_y)
+
+            self.graph_cps.BottomLeft = bottom_left
+            self.graph_cps.TopRight = top_right
+
+            # print(f'INFO - CPS_GRAPH - Graph boundaries: {bottom_left} - {top_right}')
 
             if max_cps_entry > self.max_cps_entry:
                 self.max_cps_entry = max_cps_entry
 
             self.graph_cps.erase()
             if self.queue.fast_target.target_cps > 0: # Draw target line
-                self.graph_cps.draw_line((0, self.queue.fast_target.target_cps), (60, self.queue.fast_target.target_cps))
+                self.graph_cps.draw_line((0, target.target_cps), (top_right_x, target.target_cps))
 
             if len(self.queue.fast_target.cps_history) > 1:
-                last_y = self.queue.fast_target.cps_history[0]
+                last_y = target.cps_history[0][1]
 
             for entry in self.queue.fast_target.cps_history:
-                next_x = last_x + 1
-                self.graph_cps.draw_line((last_x, last_y), (next_x, entry), color='red', width=2)
-                last_x = next_x
-                last_y = entry
+                # print(f'INFO - CPSGRAPH - New line from ({last_x},{last_y}) to {entry}')
+                self.graph_cps.draw_line((last_x, last_y), (entry[0], entry[1]), color='red', width=2)
+                last_x = entry[0]
+                last_y = entry[1]
+
+            event_colors = {
+                'update_thread' :   'blue',
+                'GoldenCookie'  :   'gold',
+                'HandleOne'     :   'green'
+            }
+            for entry in self.queue.event_history:
+                normalized_entry = self.queue.fast_target.normalize_timestamp(entry[0])
+                color = event_colors[entry[1]]
+                if normalized_entry > bottom_left_x and normalized_entry < top_right_x:
+                    self.graph_cps.draw_line((normalized_entry, bottom_left_y), (normalized_entry, top_right_y), color=color, width=2)
+
 
     def display_current(self):
         self.graph_cur.erase()
@@ -785,6 +818,14 @@ class App:
             if value.isdigit() and int(value) >= 0:
                 self.queue.target_cps = int(value)
                 self.window[MAX_CPS_CUR].update(value=self.queue.target_cps)
+            else:
+                print(f'WARN - invalid Target cps value ({value})')
+
+        value = values[CPS_UPDATE]
+        if value != '':
+            if value.isdigit() and int(value) >= 0:
+                self.queue.cps_update = int(value)
+                self.window[CPS_UPDATE_CUR].update(value=self.queue.cps_update)
             else:
                 print(f'WARN - invalid Target cps value ({value})')
 

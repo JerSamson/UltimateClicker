@@ -53,6 +53,8 @@ class ClickHandler:
         self.last_golden_cookie_pos = None
         self.golden_clicked = 0
         self.target_cps = 0
+        self.event_history = []
+        self.cps_update = 0.5
 
     def get_allowed_positions(self):
         #MaybeLock
@@ -109,7 +111,7 @@ class ClickHandler:
     def stop(self):
         self.running = False
         self.handling_one = False
-
+        self.event_history.clear()
         for tar in self.targets:
             tar.stop()
         self.click_queue.empty_queue()
@@ -125,6 +127,7 @@ class ClickHandler:
         
         self.running = True
 
+        self.event_history.clear()
         for tar in self.targets:
             tar.start()
 
@@ -165,9 +168,11 @@ class ClickHandler:
                 else:
                     potentials_targets[i].enabled = False
 
-        if self.fast_target is not None and self.target_cps >= 0:
-            self.fast_target.target_cps = self.target_cps
-
+        if self.fast_target is not None:
+            if self.target_cps >= 0:
+                self.fast_target.target_cps = self.target_cps
+            self.fast_target.cps_compute_freq = self.cps_update
+            
         if current is not self.fast_target:
             self.has_update = True
 
@@ -227,10 +232,18 @@ class ClickHandler:
         print('INFO - Done waiting.')
         return True
     
+    def add_event_entry(self, name):
+        ts = time.time()
+        print(f'INFO - Add_event_entry - Adding entry at timestamp {ts}')
+        self.event_history.append((ts, name))
+
     def update_thread(self, patient=True):
         print('INFO - ClickHandler.update_thread() thread started')
+
         while self.running:
             try:
+                if self.has_fast_target():
+                    self.add_event_entry('update_thread')
                 print('INFO - ClickHandler.update_thread() looped')
                 for tar in self.targets:
                     if not isinstance(tar, FastTarget) and tar.enabled and tar.check_trigger():
@@ -307,6 +320,7 @@ class ClickHandler:
         streak_cnt = 0
 
         while self.running:
+            self.add_event_entry('GoldenCookie')
             print('INFO - ClickHandler.SeekAndClickGOOOOLD() - SEEKING')
             MaybeACookie = SEEK_GOLDEN_COOKIES()
 
@@ -342,6 +356,7 @@ class ClickHandler:
 
     def handle_one(self):
         try:
+            self.add_event_entry('HandleOne')
             print('INFO - ClickHandler.handle_one() thread started')
             self.handling_one = True
             self.next_target = self.get_from_queue()

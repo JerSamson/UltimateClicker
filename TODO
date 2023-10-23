@@ -1,4 +1,4 @@
-Parameter to limit max CPS
+DONE - Parameter to limit max CPS
 Delete save
 Auto save to specified file instead of default 'auto_save'
 
@@ -11,7 +11,7 @@ Instead of checking individual tracker target zones for triggers, to save comput
 
 Ability to move the position of an existing target
 
-Real-Time cps graph
+DONE - Real-Time cps graph
 
 
 Simple GUI for only fast clicking in a separate tab

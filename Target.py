@@ -16,8 +16,8 @@ from DetectionMode import detectionMode
 from RepeatedTimer import RepeatedTimer
 from simple_pid import PID
 
-from numba import jit, cuda 
-import numpy as np 
+from numba import jit, cuda
+import numpy as np
 
 import mouse
 def click_mouse(x, y, button):
@@ -51,7 +51,7 @@ class BaseTarget(object):
         self.priority_mode = 'lowest_first'
         self.priority = 0
 
-    def __lt__(self, target): 
+    def __lt__(self, target):
         return self.priority < target.priority
 
     def __eq__(self, __value: object) -> bool:
@@ -59,7 +59,7 @@ class BaseTarget(object):
 
     def get_priority(self, tar):
         raise NotImplementedError()
-    
+
     def is_ready(self):
         raise NotImplementedError()
 
@@ -98,13 +98,13 @@ class BaseTarget(object):
 
     def handle(self):
         raise NotImplementedError()
-    
+
 class IdleTarget(BaseTarget):
     def __init__(self, x, y, delay):
         BaseTarget.__init__(self, x, y)
         self.get_ref_area()
         self.delay = delay
-        
+
     def is_ready(self):
         return True
 
@@ -114,14 +114,14 @@ class IdleTarget(BaseTarget):
             print(f'Total time:\t{int(time.time()-self.start)}s')
             print(f'Total clicks:\t{self.times_clicked} clicks')
             print(f'Next click in:\t{int(math.ceil(self.idle_delay - (time.time() - self.last_click)))}s')
-    
+
     def get_priority(self):
         if self.priority != 0:
             return self.priority
         else:
             p = self.type_priority[IdleTarget]
             return p
-    
+
     def to_csv(self):
         return ['IDLE', self.x, self.y, '', self.times_clicked]
 
@@ -154,12 +154,12 @@ class IdleTarget(BaseTarget):
         else:
             self.handled=False
             return False
-    
+
 class FastTarget(BaseTarget):
     def __init__(self, x, y, info_freq=0, active=False):
         BaseTarget.__init__(self, x, y, info_freq, active)
         self.delay = 0.0001
-        self.init_delay = self.delay 
+        self.init_delay = self.delay
         self.most_efficient_delay = self.delay
         self.first_click_time = 0
         self.cps          = 0
@@ -170,14 +170,13 @@ class FastTarget(BaseTarget):
         self.last_handle  = time.time()
         self.last_nb_clicks = 0
         self.cps_history    = []
+        self.actual_timestamps = []
+        self.max_history_len = 60
         self.pid = PID(-0.00000025, -0.000025, 0, output_limits=(0,1))
-
-        # self.nb_clicks_theo = 0
-        # self.last_nb_clicks_theo = 0
-        self.get_ref_area()
         self.last_cps_time = 0
-        self.cps_compute_freq = 0.33
+        self.cps_compute_freq = 0.1
         self.start_time       = time.time()
+        self.get_ref_area()
 
     def approxCpsAverage(self, new_sample):
         self.n_cps_sample += 1
@@ -186,7 +185,7 @@ class FastTarget(BaseTarget):
         avg += new_sample / self.n_cps_sample
         self.avg_cps = avg
         return self.avg_cps
-    
+
     def is_ready(self):
         return True
 
@@ -222,12 +221,12 @@ class FastTarget(BaseTarget):
             im.save(buffer, format='PNG')
             im.close()
             self.ref_area = base64.b64encode(buffer.getvalue())
-            
+
         except Exception as e:
             print(f'ERROR - FAST - get_ref_area ({e})')
             self.ref_area = None
             pass # Minor repercussions
-    
+
     def stop(self):
         self.cps = 0
         self.avg_cps = 0
@@ -235,7 +234,7 @@ class FastTarget(BaseTarget):
         self.first_click_time = 0
         self.cps_history.clear()
         return super().stop()
-    
+
     def start(self):
         self.cps = 0
         self.avg_cps = 0
@@ -281,22 +280,38 @@ class FastTarget(BaseTarget):
         if self.cps > self.highest_cps:
             self.delay *= 0.999
         else:
-            self.delay = self.most_efficient_delay#*(self.cps_theo/self.cps) 
-    
+            self.delay = self.most_efficient_delay#*(self.cps_theo/self.cps)
+
+    def normalize_timestamp(self, ts):
+        if len(self.cps_history) > 0:
+            min_cps_timestamp = min([entry[2] for entry in self.cps_history])
+            # min_cps_timestamp = min([entry for entry in self.actual_timestamps])
+        else:
+            min_cps_timestamp = time.time()
+
+        relative_timestamp = int(round((ts - min_cps_timestamp), 3)*1000)
+        return relative_timestamp
+
     def update_cps(self):
         if self.first_click_time == 0:
             return
-        
+
         now = time.time()
         self.cps = math.ceil((self.times_clicked - self.last_nb_clicks)/(now - self.last_cps_time))
         self.last_cps_time = now
         self.last_nb_clicks= self.times_clicked
 
-        if len(self.cps_history) < 60:
-            self.cps_history.append(self.cps)
-        else:
+        actual_timestamp = time.time()
+        relative_timestamp = self.normalize_timestamp(actual_timestamp)
+
+        # print(f'INFO - FASTTARGET - Relative Timestamp: {relative_timestamp}')
+
+        if len(self.cps_history) >= self.max_history_len:
             self.cps_history.pop(0)
-            self.cps_history.append(self.cps)
+            for entry in self.cps_history:
+                entry[0] = self.normalize_timestamp(entry[2])
+
+        self.cps_history.append([relative_timestamp, self.cps, actual_timestamp])
 
         if self.cps > self.highest_cps:
             self.highest_cps = self.cps
@@ -304,13 +319,9 @@ class FastTarget(BaseTarget):
 
         if self.times_clicked > 100:
             self.approxCpsAverage(self.cps)
-        
+
         if self.target_cps > 0:
             self.delay = self.pid(self.cps)
-            # self.delay += delay_tweak
-            print(f"DEBUG - PID - NewVal:{self.delay}")
-
-        # self.tweak_delay()
 
 
 
@@ -337,7 +348,7 @@ class TrackerTarget(BaseTarget):
     def get_priority(self):
         p = self.type_priority[TrackerTarget]
         if self.priority_mode == 'lowest_first':
-            if self.mode in [detectionMode.different, detectionMode.same]: 
+            if self.mode in [detectionMode.different, detectionMode.same]:
                 p -= self.y // 47
                 p *= 3
             elif self.mode == detectionMode.change:
@@ -347,7 +358,7 @@ class TrackerTarget(BaseTarget):
 
     def is_ready(self):
         return self.acquired
-    
+
     def get_ref_area(self):
         try:
             res = pyautogui.size()
@@ -380,7 +391,7 @@ class TrackerTarget(BaseTarget):
         self.get_ref_area()
 
         self.color = self.get_color()
-        self.acquired = True        
+        self.acquired = True
         self.waiting_acquisition = False
 
     def bg_color_acquisition(self):
@@ -393,10 +404,10 @@ class TrackerTarget(BaseTarget):
         if time.time() - self.last_handle < self.delay_after_handle_2_trigger:
             print(f'WARN - TARGET[{self.targetid}] - Too soon after handling to check trigger to avoid capturing the cursor. Skipping')
             return False
-        
+
         if not self.is_ready():
             raise Exception(f'Tried to check trigger before ref was acquired (TARGET[{self.targetid}])')
-        
+
         start = time.time_ns()
 
         old_value = self.triggered
@@ -412,21 +423,21 @@ class TrackerTarget(BaseTarget):
             self.triggered = not self.compare_color(cur_color)
         else:
             raise Exception('Unsupported trigger mode')
-        
+
         if (not old_value and self.triggered): # Has become triggered
             print(f'INFO - TARGET[{self.targetid}] has triggered. now:{cur_color} ref:{self.color}')
             self.handled = False
             # print(f'Target {self.targetid} triggered.\n\tcur:{cur_color} og:{self.color}')
 
         if self.triggered:
-            self.last_color_trigger = cur_color 
+            self.last_color_trigger = cur_color
         else:
             self.handled = True
 
         # print(f'INFO - TARGET[{self.targetid}] - Checked trigger in {int((time.time_ns()-start)/1000000)}ms')
 
-        return self.triggered        
-    
+        return self.triggered
+
     def info(self):
         if self.active:
             pass
@@ -435,7 +446,7 @@ class TrackerTarget(BaseTarget):
         dR = abs(self.color[0] - color[0])
         dG = abs(self.color[1] - color[1])
         dB = abs(self.color[2] - color[2])
-        dTotal = dR+dG+dB 
+        dTotal = dR+dG+dB
         same = dTotal < self.tolerance
 
         if same and self.color != color:
@@ -464,13 +475,13 @@ class GOLDENTARGET(BaseTarget):
 
     def get_priority(self):
         return -999
-    
+
     def is_ready(self):
         return True
-    
+
     def check_trigger(self):
         return True
-    
+
     def handle(self):
         self.single_shot_triggered = True
         win32api.SetCursorPos((self.x,self.y))
