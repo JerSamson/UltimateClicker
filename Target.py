@@ -17,11 +17,14 @@ from RepeatedTimer import RepeatedTimer
 from simple_pid import PID
 from event_graph import EventGraph, CpsEntry
 
+from Settings import Settings
 
 from numba import jit, cuda
 import numpy as np
 
 import mouse
+
+
 def click_mouse(x, y, button):
     mouse.move(x, y, absolute=True)
     mouse.click(button=button)
@@ -33,6 +36,7 @@ IMAGE_SIZE_Y = 30
 
 class BaseTarget(object):
     def __init__(self, x, y, info_freq=0, active=False):
+        self.settings = Settings()
         self.x = x
         self.y = y
         self.info_freq = info_freq
@@ -168,15 +172,10 @@ class FastTarget(BaseTarget):
         self.avg_cps      = 0
         self.n_cps_sample = 0
         self.highest_cps  = 0
-        self.target_cps   = 0
         self.last_handle  = time.time()
         self.last_nb_clicks = 0
-        self.cps_history    = []
-        self.actual_timestamps = []
-        self.max_history_len = 60
         self.pid = PID(-0.00000025, -0.000025, 0, output_limits=(0,1))
         self.last_cps_time = 0
-        self.cps_compute_freq = 0.1
         self.start_time       = time.time()
         self.eventgraph = EventGraph()
 
@@ -206,9 +205,9 @@ class FastTarget(BaseTarget):
     def click(self):
         if self.first_click_time == 0:
             self.first_click_time = time.time()
-            if self.target_cps > 0:
-                self.pid.setpoint = self.target_cps
-                self.pid.output_limits = (0.5/self.target_cps, 1)
+            if self.settings.target_cps> 0:
+                self.pid.setpoint = self.settings.target_cps
+                self.pid.output_limits = (0.5/self.settings.target_cps, 1)
         # self.nb_clicks = self.nb_clicks + 1
         return super().click()
 
@@ -236,7 +235,6 @@ class FastTarget(BaseTarget):
         self.avg_cps = 0
         self.n_cps_sample = 0
         self.first_click_time = 0
-        self.cps_history.clear()
         return super().stop()
 
     def start(self):
@@ -244,8 +242,6 @@ class FastTarget(BaseTarget):
         self.avg_cps = 0
         self.n_cps_sample = 0
         self.first_click_time = 0
-        self.eventgraph.target_cps = self.target_cps
-        self.cps_history.clear()
         return super().start()
 
     def info(self):
@@ -271,7 +267,7 @@ class FastTarget(BaseTarget):
 
             self.click()
 
-            if time.time() - self.last_cps_time > self.cps_compute_freq:
+            if time.time() - self.last_cps_time > self.settings.cps_update_delay:
                 self.update_cps()
                 # self.tweak_delay()
 
@@ -280,22 +276,6 @@ class FastTarget(BaseTarget):
             return True
         else:
             return False
-
-    def tweak_delay(self):
-        if self.cps > self.highest_cps:
-            self.delay *= 0.999
-        else:
-            self.delay = self.most_efficient_delay#*(self.cps_theo/self.cps)
-
-    def normalize_timestamp(self, ts):
-        if len(self.cps_history) > 0:
-            min_cps_timestamp = min([entry[2] for entry in self.cps_history])
-            # min_cps_timestamp = min([entry for entry in self.actual_timestamps])
-        else:
-            min_cps_timestamp = time.time()
-
-        relative_timestamp = int(round((ts - min_cps_timestamp), 3)*1000)
-        return relative_timestamp
 
     def update_cps(self):
         if self.first_click_time == 0:
@@ -306,15 +286,7 @@ class FastTarget(BaseTarget):
         self.last_cps_time = now
         self.last_nb_clicks= self.times_clicked
 
-        actual_timestamp = time.time()
-        relative_timestamp = self.normalize_timestamp(actual_timestamp)
-
         # print(f'INFO - FASTTARGET - Relative Timestamp: {relative_timestamp}')
-
-        if len(self.cps_history) >= self.max_history_len:
-            self.cps_history.pop(0)
-            for entry in self.cps_history:
-                entry[0] = self.normalize_timestamp(entry[2])
         
         self.eventgraph.add_entry(CpsEntry(now, self.cps))
 
@@ -327,7 +299,7 @@ class FastTarget(BaseTarget):
         if self.times_clicked > 100:
             self.approxCpsAverage(self.cps)
 
-        if self.target_cps > 0:
+        if self.settings.target_cps> 0:
             self.delay = self.pid(self.cps)
 
 
@@ -339,16 +311,16 @@ class TrackerTarget(BaseTarget):
         self.mode = mode
         self.triggered = False
         self.waiting_acquisition = False
-        self.acquisition_min_dist = mindist
+        self.acquisition_min_dist = mindist #TODO : Setting
         self.acquired = False
         self.color = None
-        self.priority = self.get_priority()
-        self.bg_color_acquisition()
         self.last_handle = time.time()
         self.last_color_trigger = None
         self.delay_after_handle_2_trigger = 1
         self.tolerance = 5
-
+        self.priority = self.get_priority()
+        self.bg_color_acquisition()
+  
     def to_csv(self):
         return ['Tracker', self.x, self.y, int(self.mode), self.times_clicked]
 
@@ -414,8 +386,6 @@ class TrackerTarget(BaseTarget):
 
         if not self.is_ready():
             raise Exception(f'Tried to check trigger before ref was acquired (TARGET[{self.targetid}])')
-
-        start = time.time_ns()
 
         old_value = self.triggered
         cur_color = self.get_color()

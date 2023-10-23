@@ -3,6 +3,8 @@ from threading import Lock, Thread
 import time
 from ClickQueue import *
 from screenshot import SEEK_GOLDEN_COOKIES
+
+from Settings import Settings
 from event_graph import EventGraph, EventEntry
 
 # def ctype_async_raise(target_tid, exception):
@@ -39,8 +41,6 @@ class ClickHandler:
         self.using_smart_wait = True
         self.additionnal_wait = 0
         self.patience_level   = 5 #s
-        self.max_patience_stack    = 10
-        self.triggercheck = None
         self.patience_resolution   = 1
         self.waiting = False
         self.wait_prog = 0
@@ -50,12 +50,10 @@ class ClickHandler:
         self.handling_one = False
         self.top_priority = 9999
         self.impatientThread = None
-        self.CLICK_GOLDEN_COOKIES = True
         self.last_golden_cookie_pos = None
         self.golden_clicked = 0
-        self.target_cps = 0
-        self.event_history = []
-        self.cps_update = 0.5
+
+        self.settings = Settings()
         self.eventgraph = EventGraph()
 
     def get_allowed_positions(self):
@@ -84,7 +82,7 @@ class ClickHandler:
         
         self.add_wait_lock.acquire()
         try:
-            if self.additionnal_wait + inc < self.max_patience_stack and self.additionnal_wait + inc >= 0:
+            if self.additionnal_wait + inc < self.settings.max_patience_stack and self.additionnal_wait + inc >= 0:
                 self.additionnal_wait += inc
                 if tar is not None:
                     print(f'INFO - Added increment for target {tar.targetid}')
@@ -169,11 +167,6 @@ class ClickHandler:
                     self.fast_target = potentials_targets[i]
                 else:
                     potentials_targets[i].enabled = False
-
-        if self.fast_target is not None:
-            if self.target_cps >= 0:
-                self.fast_target.target_cps = self.target_cps
-            self.fast_target.cps_compute_freq = self.cps_update
 
         if current is not self.fast_target:
             self.has_update = True
@@ -265,7 +258,7 @@ class ClickHandler:
                     self.targets = self.click_queue.clean_queue(self.targets)
             except Exception as e:
                 print(f'ERROR - ClickHandler.update_thread() - thread failed ({e})')
-            tracker_Interval = self.triggercheck if self.triggercheck is not None else self.patience_level if self.patience_level > 0 else 1 #self.patience_level/2
+            tracker_Interval = self.settings.trigger_check_rate if self.settings.trigger_check_rate is not None else self.patience_level if self.patience_level > 0 else 1 #self.patience_level/2
             self.wait(tracker_Interval)
         print('INFO - ClickHandler.update_thread() thread finished')
 
@@ -296,14 +289,8 @@ class ClickHandler:
         while self.running:
             self.handle_task(self.fast_target)
 
-            if self.fast_target.target_cps > 0 and self.fast_target.last_handle > 0:
+            if self.settings.target_cps > 0 and self.fast_target.last_handle > 0:
                 time.sleep(self.fast_target.delay)
-                # delay = (1/self.fast_target.target_cps) - (time.time() - self.fast_target.last_handle)
-            #     if delay > 0:
-            #         print(f'INFO - Waiting {round(delay, 2)}s to limit cps to {self.fast_target.target_cps}')
-            #         self.wait(delay)
-            # else:
-            #     time.sleep(self.fast_target.delay)
 
             if not self.running: break
         print('INFO - ClickHandler.fast_click_thread() thread finished')
@@ -397,7 +384,7 @@ class ClickHandler:
         self.additionnal_wait = 0
         self.impatientThread = None
 
-        if self.CLICK_GOLDEN_COOKIES:
+        if self.settings.check_for_gold_cookie:
             gold_digger = Thread(target=self.SeekAndClickGOOOOLD, name='GOLD_DIGGER', daemon=True)
             gold_digger.start()
 
@@ -422,7 +409,7 @@ class ClickHandler:
             while self.running:
                 time.sleep(1)
 
-        if self.CLICK_GOLDEN_COOKIES:
+        if self.settings.check_for_gold_cookie:
             gold_digger.join()
 
         if self.trigger_thread is not None:

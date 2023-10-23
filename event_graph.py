@@ -3,6 +3,7 @@ from enum import IntEnum
 import time
 import PySimpleGUI as sg
 from singleton import Singleton
+from Settings import Settings
 
 event_colors = {
     'cps'           :   'red',
@@ -35,12 +36,12 @@ class EventEntry(GraphEntry):
 class EventGraph(metaclass=Singleton):
     def __init__(self, key='-EVENTGRAPH-') -> None:
 
+        self.settings = Settings()
+
         self.canvas_size=(500,100)
 
         self.bottom_left    = (0,0)
         self.top_right      = (60, 1000)
-
-        self.target_cps = 0
 
         self.max_entry_display = 60
 
@@ -121,7 +122,7 @@ class EventGraph(metaclass=Singleton):
             cps_entries = self.cps_entries()
 
             max_cps_entry = max([entry.cps for entry in cps_entries])
-            max_cps_entry = max([max_cps_entry, self.target_cps])
+            max_cps_entry = max([max_cps_entry, self.settings.target_cps])
 
             max_cps_timestamp = max([entry.normalized_timestamp for entry in cps_entries])
             min_cps_timestamp = min([entry.normalized_timestamp for entry in cps_entries])
@@ -163,21 +164,18 @@ class EventGraph(metaclass=Singleton):
 
         cps_entries = self.cps_entries()
 
-        # if max_cps_entry > self.max_cps_entry:
-        #     self.max_cps_entry = max_cps_entry
-
-        if self.target_cps > 0: # Draw target line
-            self.graph.draw_line((0, self.target_cps), (self.top_right[0], self.target_cps))
+        if self.settings.target_cps > 0: # Draw target line
+            self.graph.draw_line((self.graph.BottomLeft[0], self.settings.target_cps), (self.top_right[0], self.settings.target_cps))
 
         if len(cps_entries) > 1:
             last_y = cps_entries[0].cps
 
         for entry in cps_entries:
             self.normalize_timestamp(entry)
-            # print(f'INFO - CPSGRAPH - New line from ({last_x},{last_y}) to {entry}')
             self.graph.draw_line((last_x, last_y), (entry.normalized_timestamp, entry.cps), color=event_colors['cps'], width=2)
             last_x = entry.normalized_timestamp
             last_y = entry.cps
+            # print(f'INFO - CPSGRAPH - New line from ({last_x},{last_y}) to {entry}')
 
     def draw_event(self):
         for entry in self.event_entries():
