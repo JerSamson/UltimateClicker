@@ -407,6 +407,7 @@ class TrackerTarget(BaseTarget):
             raise Exception(f'Tried to check trigger before ref was acquired (TARGET[{self.targetid}])')
 
         old_value = self.triggered
+        # cur_color = self.get_color(screenshot)
         cur_color = self.get_color(screenshot)
 
         if cur_color == (30, 30, 30):

@@ -261,10 +261,10 @@ class ClickHandler:
             try:
                 self.add_event_entry('update_thread')
                 print('INFO - ClickHandler.update_thread() looped =========================================')
-                screenshot = np.array(ScreenRecorder().get_screen())
-                print(f'DEBUG - Update_thread() - Getting screenshot took {round(time.time()-start,2)}s =-=--=-=-=-=-=-=')
+                screenshot = ScreenRecorder().get_screen()
+                # print(f'DEBUG - Update_thread() - Getting screenshot took {round(time.time()-start,2)}s =-=--=-=-=-=-=-=')
                 
-                checking_trig_start = time.time()
+                # checking_trig_start = time.time()
                 for tar in self.targets:
                     if not isinstance(tar, FastTarget) and tar.enabled and tar.check_trigger(screenshot):
                         if self.next_target is None or tar is not self.next_target[1]:
@@ -272,7 +272,7 @@ class ClickHandler:
                                 self.increment_patience(1, tar)
                                 self.has_update = True
 
-                print(f'DEBUG - Update_thread() - checking triggers took {round(time.time()-checking_trig_start,2)}s =-=--=-=-=-=-=-=')
+                # print(f'DEBUG - Update_thread() - checking triggers took {round(time.time()-checking_trig_start,2)}s =-=--=-=-=-=-=-=')
 
                 if self.patience_level > 0:
                     Thread(target=self.try_handle_one, name='TryHandleOne', daemon=True).start()
@@ -285,7 +285,7 @@ class ClickHandler:
             stop = time.time()
 
             actual_wait_time = tracker_Interval - (stop-start)
-            print(f'DEBUG - Update_thread() - Took {round(stop-start, 2)}s - Waiting time is {actual_wait_time}s =-=--=-=-=-=-=-=')
+            # print(f'DEBUG - Update_thread() - Took {round(stop-start, 2)}s - Waiting time is {actual_wait_time}s =-=--=-=-=-=-=-=')
 
             if actual_wait_time > 0:
                 self.wait(actual_wait_time)
