@@ -1,15 +1,18 @@
 from ctypes import Array
 from enum import IntEnum
+import math
 import time
 import PySimpleGUI as sg
 from singleton import Singleton
 from Settings import Settings
+from numba import jit
 
 event_colors = {
     'cps'           :   'red',
     'update_thread' :   'blue',
     'GoldenCookie'  :   'gold',
-    'HandleOne'     :   'green'
+    'HandleOne'     :   'green',
+    'SecondMarker'  :   'gray90'
 }
 
 class EntryType(IntEnum):
@@ -45,7 +48,8 @@ class EventGraph(metaclass=Singleton):
 
         self.max_entry_display = 60
 
-        self.entries = []
+        self.event_entries = []
+        self.cps_entries = []
 
         self.graph = sg.Graph(canvas_size=self.canvas_size,
             graph_bottom_left=self.bottom_left,
@@ -67,7 +71,8 @@ class EventGraph(metaclass=Singleton):
         self.graph.erase()
 
     def clear_entries(self):
-        self.entries.clear()
+        self.cps_entries.clear()
+        self.event_entries.clear()
 
     def is_cps_entry(self, entry):
         return isinstance(entry, CpsEntry)
@@ -76,56 +81,61 @@ class EventGraph(metaclass=Singleton):
         return isinstance(entry, EventEntry)
     
     def has_cps_entries(self):
-        return len(self.cps_entries()) > 0
+        return len(self.cps_entries) > 0
 
     def has_event_entries(self):
-        return len(self.event_entries()) > 0
+        return len(self.event_entries) > 0
     
-    def cps_entries(self):
-        return [entries for entries in self.entries if self.is_cps_entry(entries)]
+    def min_cps_entry_timestamp(self):
+        if len(self.cps_entries) > 0:
+            return min([entry.timestamp for entry in self.cps_entries])
+        else:
+            return 0
+        
+    def max_cps_entry_timestamp(self):
+        if len(self.cps_entries) > 0:
+            return max([entry.timestamp for entry in self.cps_entries])
+        else:
+            return 0
+        
+    def add_cps_entry(self, entry):
+        if len(self.cps_entries) >= self.max_entry_display:
+            self.cps_entries.pop(0)
 
-    def event_entries(self):
-        return [entries for entries in self.entries if self.is_event_entry(entries)]
+        self.cps_entries.append(entry)
+        self.new_entries = True
 
-    def add_entry(self, entry):
-        if len(self.entries) >= self.max_entry_display:
-            self.entries.pop(0)
-
-        self.entries.append(entry)
+    def add_event_entry(self, entry):
+        self.event_entries.append(entry)
         self.new_entries = True
 
     def normalize_timestamp(self, entry):
         if self.has_cps_entries():
-            cps_entries = self.cps_entries()
 
-            if len(cps_entries) > 0:
-                min_cps_timestamp = min([_entry.timestamp for _entry in cps_entries])
+            if len(self.cps_entries) > 0:
+                min_cps_timestamp = min([_entry.timestamp for _entry in self.cps_entries])
             else:
                 min_cps_timestamp = time.time()
 
             entry.normalized_timestamp = int(round((entry.timestamp - min_cps_timestamp), 3)*1000)
 
         elif self.has_event_entries():
-            event_entries = self.event_entries()
-
-            if len(event_entries) > 0:
-                min_event_timestamp = min([_entry.timestamp for _entry in event_entries])
+            if len(self.event_entries) > 0:
+                min_event_timestamp = min([_entry.timestamp for _entry in self.event_entries])
             else:
                 min_event_timestamp = time.time()
 
             entry.normalized_timestamp = int(round((entry.timestamp - min_event_timestamp), 3)*1000)
-            print(f'INFO - event_graph.normalize_timestamp - EventEntry normalized to {entry.normalized_timestamp}')
+            print(f'INFO - event_graph.normalize_timestamp - EventEntry [{entry.name}] normalized to {entry.normalized_timestamp}')
     
 
     def adapt_graph_size(self):
         if self.has_cps_entries():
-            cps_entries = self.cps_entries()
-
-            max_cps_entry = max([entry.cps for entry in cps_entries])
+            max_cps_entry = max([entry.cps for entry in self.cps_entries])
             max_cps_entry = max([max_cps_entry, self.settings.target_cps])
 
-            max_cps_timestamp = max([entry.normalized_timestamp for entry in cps_entries])
-            min_cps_timestamp = min([entry.normalized_timestamp for entry in cps_entries])
+            max_cps_timestamp = max([entry.normalized_timestamp for entry in self.cps_entries])
+            min_cps_timestamp = min([entry.normalized_timestamp for entry in self.cps_entries])
 
             bottom_left_x = min_cps_timestamp
             bottom_left_y = 0
@@ -140,9 +150,8 @@ class EventGraph(metaclass=Singleton):
             self.graph.TopRight = self.top_right
 
         elif self.has_event_entries():
-            event_entries = self.event_entries()
-            max_timestamp = max([entry.normalized_timestamp for entry in event_entries])
-            min_timestamp = min([entry.normalized_timestamp for entry in event_entries])
+            max_timestamp = max([entry.normalized_timestamp for entry in self.event_entries])
+            min_timestamp = min([entry.normalized_timestamp for entry in self.event_entries])
 
             bottom_left_x = min_timestamp if min_timestamp > 0 else -1
             bottom_left_y = self.bottom_left[1]
@@ -155,46 +164,57 @@ class EventGraph(metaclass=Singleton):
             self.graph.BottomLeft = self.bottom_left
             self.graph.TopRight = self.top_right
 
-        print(f'INFO - event_graph.adapt_graph_size() - Graph size: x:[{self.graph.BottomLeft[0]}, {self.graph.TopRight[0]}] y:[{self.graph.BottomLeft[1]}, {self.graph.TopRight[1]}]')
+        # print(f'INFO - event_graph.adapt_graph_size() - Graph size: x:[{self.graph.BottomLeft[0]}, {self.graph.TopRight[0]}] y:[{self.graph.BottomLeft[1]}, {self.graph.TopRight[1]}]')
 
 
     def draw_cps(self):
-        last_x = 0
-        last_y = 0
-
-        cps_entries = self.cps_entries()
-
         if self.settings.target_cps > 0: # Draw target line
-            self.graph.draw_line((self.graph.BottomLeft[0], self.settings.target_cps), (self.top_right[0], self.settings.target_cps))
+            self.graph.draw_line((self.graph.BottomLeft[0], self.settings.target_cps), (self.top_right[0], self.settings.target_cps), width=1)
 
-        if len(cps_entries) > 1:
-            last_y = cps_entries[0].cps
-
-        for entry in cps_entries:
-            self.normalize_timestamp(entry)
-            self.graph.draw_line((last_x, last_y), (entry.normalized_timestamp, entry.cps), color=event_colors['cps'], width=2)
-            last_x = entry.normalized_timestamp
-            last_y = entry.cps
-            # print(f'INFO - CPSGRAPH - New line from ({last_x},{last_y}) to {entry}')
+        if len(self.cps_entries) > 0:
+            points = []
+            for entry in self.cps_entries:
+                self.normalize_timestamp(entry)
+                points.append((entry.normalized_timestamp, entry.cps))
+            self.graph.draw_lines(points=points, color=event_colors['cps'], width=2)
 
     def draw_event(self):
-        for entry in self.event_entries():
+        for entry in self.event_entries:
             self.normalize_timestamp(entry)
             color = event_colors[entry.name]
+    
+            # if entry.normalized_timestamp < self.bottom_left[0]:
+            #     self.entries.remove(entry)
 
-            if entry.normalized_timestamp > self.bottom_left[0]:
-                print(f'INFO - event_graph.draw_event() - Drawing {entry.name} event at normalized ts {entry.normalized_timestamp}')
+            # self.graph.draw_lines([(entry.normalized_timestamp, self.graph.BottomLeft[1])])
+
+            if entry.normalized_timestamp > self.bottom_left[0] and entry.normalized_timestamp < self.top_right[0]:
+                # print(f'INFO - event_graph.draw_event() - Drawing {entry.name} event at normalized ts {entry.normalized_timestamp}')
                 self.graph.draw_line((entry.normalized_timestamp, self.graph.BottomLeft[1]), (entry.normalized_timestamp, self.graph.TopRight[1]), color=color, width=2)
-            else:
-                self.entries.remove(entry)
+            elif entry.normalized_timestamp < self.bottom_left[0]:
+                self.event_entries.remove(entry)
 
+    def draw_seconds(self):
+        min = int(math.floor(self.min_cps_entry_timestamp()))
+        max = int(math.ceil(self.max_cps_entry_timestamp()))
+        ts_range = max - min 
+
+        # print(f'INFO - event_graph.draw_seconds() - range={ts_range}')
+
+        for i in range(ts_range):
+            self.add_event_entry(EventEntry(min+i, 'SecondMarker'))
+
+    @jit(target_backend='cuda', forceobj=True)
     def update(self):
         if self.has_new_entries():
             self.graph.erase()
             self.adapt_graph_size()
 
-            if self.has_cps_entries():
-                self.draw_cps()
+            self.draw_seconds()
 
             if self.has_event_entries():
                 self.draw_event()
+
+            if self.has_cps_entries():
+                self.draw_cps()
+

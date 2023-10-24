@@ -2,16 +2,12 @@ import numpy as np
 import re
 import cv2
 import time
-import win32api
-import datetime
 import os
 from PIL import ImageGrab
 from PIL import Image
-from pywinauto import Desktop
 from pywinauto import mouse
 from pywinauto.application import Application
 from Target import GOLDENTARGET
-from numba import jit, cuda 
 import numpy as np 
 
 THRESHOLD_VALUE = 127  # Tweak as needed

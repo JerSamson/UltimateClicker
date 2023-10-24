@@ -114,7 +114,7 @@ class App:
         self.track_target_lock = Lock()
         self.selected_target = None
         self.last_target_drew = None
-        self.next_target_drew = None
+        self.last_next_target_drew = None
         self.last_selected = None
         self.aborted = False
         self.running = False
@@ -137,13 +137,13 @@ class App:
         text_width = 16
         settings_tab=[
             [sg.Text('Saves Dir', size=(text_width,1), tooltip='Directory to load and save data'), sg.InputText(key=SAVE_FOLDER, size=(15,1)), sg.Text(key=SAVE_FOLDER_CUR, text=self.settings.save_dir, text_color='light gray', auto_size_text=True)], 
-            [sg.Text('Target zone', size=(text_width,1), tooltip='Height and width (px) of the area used to check if target has triggered.'), sg.InputText(key=TARGET_ZONE, size=(15,1)), sg.Text(key=TARGET_ZONE_CUR, text=self.settings.target_zone, text_color='light gray', auto_size_text=True)], 
-            [sg.Text('UI refresh', size=(text_width,1), tooltip='Delay (ms) between UI refresh while running.\nLow values can affect performances'), sg.InputText(key=UI_UPDATE, size=(15,1)), sg.Text(key=UI_UPDATE_CUR, text=self.settings.ui_update, text_color='light gray', auto_size_text=True)], 
-            [sg.Text('Trigger check rate', size=(text_width,1), tooltip='Delay (s) between trigger checks (Same as current patience level by default)\nLow values can affect performances'), sg.InputText(key=TRIGGER_CHECK_RATE, size=(15,1)), sg.Text(key=TRIGGER_CHECK_RATE_CUR, text=f'{"Same as patience" if self.settings.trigger_check_rate is None else self.settings.trigger_check_rate}', text_color='light gray', auto_size_text=True)], 
+            [sg.Text('Target zone (px)', size=(text_width,1), tooltip='Height and width (px) of the area used to check if target has triggered.'), sg.InputText(key=TARGET_ZONE, size=(15,1)), sg.Text(key=TARGET_ZONE_CUR, text=self.settings.target_zone, text_color='light gray', auto_size_text=True)], 
+            [sg.Text('UI refresh (ms)', size=(text_width,1), tooltip='Delay (ms) between UI refresh while running.\nLow values can affect performances'), sg.InputText(key=UI_UPDATE, size=(15,1)), sg.Text(key=UI_UPDATE_CUR, text=self.settings.ui_update, text_color='light gray', auto_size_text=True)], 
+            [sg.Text('Trigger check rate (s)', size=(text_width,1), tooltip='Delay (s) between trigger checks (Same as current patience level by default)\nLow values can affect performances'), sg.InputText(key=TRIGGER_CHECK_RATE, size=(15,1)), sg.Text(key=TRIGGER_CHECK_RATE_CUR, text=f'{"Same as patience" if self.settings.trigger_check_rate is None else self.settings.trigger_check_rate}', text_color='light gray', auto_size_text=True)], 
             [sg.Text('Max patience', size=(text_width,1), tooltip='When using trackers, patience will prevent the clicker to simply click as soon as its triggered.\nEach newly triggered target add 1 stack. Each stack will take <<patience level>> sec to deplete.'), sg.InputText(key=MAX_PATIENCE, size=(15,1)), sg.Text(key=MAX_PATIENCE_CUR, text=self.settings.max_patience, text_color='light gray', auto_size_text=True)], 
             [sg.Text('Max patience Stack', size=(text_width,1), tooltip='Patience stack that would bring the queued up delay to exceed this value will be ignored.'), sg.InputText(key=MAX_PATIENCE_STACK, size=(15,1)), sg.Text(key=MAX_PATIENCE_STACK_CUR, text=self.settings.max_patience_stack, text_color='light gray', auto_size_text=True)], 
             [sg.Text('Target CPS', size=(text_width,1), tooltip='Setpoint for CPS pid of fast trgets.'), sg.InputText(key=TARGET_CPS, size=(15,1)), sg.Text(key=TARGET_CPS_CUR, text=self.settings.target_cps, text_color='light gray', auto_size_text=True)], 
-            [sg.Text('CPS Update Delay', size=(text_width,1), tooltip='Delay between cps update (fast targets).'), sg.InputText(key=CPS_UPDATE, size=(15,1)), sg.Text(key=CPS_UPDATE_CUR, text=self.settings.cps_update_delay, text_color='light gray', auto_size_text=True)], 
+            [sg.Text('CPS Update Delay (s)', size=(text_width,1), tooltip='Delay between cps update (fast targets).'), sg.InputText(key=CPS_UPDATE, size=(15,1)), sg.Text(key=CPS_UPDATE_CUR, text=self.settings.cps_update_delay, text_color='light gray', auto_size_text=True)], 
             [sg.Checkbox(default=self.settings.check_for_gold_cookie, text='GOLD DIGGER', key=GOLD_DIGGER, size=(text_width,1), tooltip='If selected, will periodically check and queue up golden cookies\n(For Cookie Clicker game)'),sg.Text(key=GOLD_DIGGER_CUR, text=f'{"CLICKING GOLD!!!" if self.settings.check_for_gold_cookie else "Nope.. T_T"}', text_color='light gray', auto_size_text=True)], 
             [sg.Button(button_text='Update', key=SUBMIT_SETTINGS)]
             ]
@@ -179,12 +179,13 @@ class App:
 
         selection_buttons = [
             sg.Sizer(0, 0),
-            sg.Button('Set Targets', key=SET_TARGET_BTN, expand_x=True, expand_y=True),
+            sg.Button('Set Targets', key=SET_TARGET_BTN, expand_x=True, expand_y=False),
             sg.Sizer(0, 0),
             sg.Button('same', key=MODE_SAME_BTN, button_color = DISABLED_COLOR, visible=False, expand_x=True, expand_y=True),
             sg.Button('diff', key=MODE_DIFF_BTN, button_color = DISABLED_COLOR, visible=False, expand_x=True, expand_y=True),
             sg.Button('change', key=MODE_CHANGE_BTN, button_color = DISABLED_COLOR, visible=False, expand_x=True, expand_y=True),
             sg.Button('fastClick', key=FAST_TRACK_BTN, button_color = DISABLED_COLOR, visible=False, expand_x=True, expand_y=True),
+            sg.Sizer(0, 0)
             ]
 
 
@@ -230,6 +231,7 @@ class App:
             sg.Frame('Next', [next_frame], visible=False, key=NEXT_FRAME, expand_x=True),
             sg.Frame('Last', [last_frame], visible=False, key=LAST_FRAME, expand_x=True),
             sg.Frame('Selected', [selected_frame], visible=False, key=SELECTED_FRAME, expand_x=True),
+            sg.Sizer(0, 0)
             ]
 
         self.patience_slider = sg.Slider(range=(0, self.settings.max_patience), default_value=5,
@@ -245,15 +247,12 @@ class App:
             [sg.Sizer(0,0), sg.Text(key=BIG_CPS, visible=False, expand_x=True, expand_y=True, font=(detailsFont, 22), justification='center', text_color='gold')], #DAA520
             [sg.Sizer(0,0), sg.Text(key=BIG_GOLD, visible=False, expand_x=True, expand_y=True, font=(detailsFont, 16), justification='center', text_color='gold')],
             [self.eventgraph.graph, sg.Sizer(0,0)],
-            [sg.Sizer(0,0)],
             [sg.Sizer(0,0), self.patience_slider],
             [sg.Sizer(0,0), sg.ProgressBar(self.queue.patience_level, orientation='h', expand_x=True, size=(20, 5),  key=PATIENCE_PROGRESS_2, visible=False, bar_color='blue')],
             [sg.Sizer(0,0), sg.ProgressBar(self.settings.max_patience_stack, orientation='h', expand_x=True, size=(20, 20), border_width= 3,  key=PATIENCE_PROGRESS, visible=False)],
-            # [sg.Text(key=NEXT_TARGET, visible=False)],
-            [sg.Sizer(0,0)],
             details,
+            [self.target_table, sg.Sizer(0,0)],
             [sg.Sizer(0,0)],
-            [self.target_table, sg.Sizer(0,0), ],
         ]
 
         bottom_row = [
@@ -275,7 +274,7 @@ class App:
             [sg.Sizer(0,0)],
             [sg.TabGroup([[
                 sg.Tab('Track', track_tab,element_justification='center'),
-                sg.Tab('Settings', settings_tab,element_justification='left')
+                sg.Tab('Settings', settings_tab, element_justification='left')
             ]])],
             [sg.Sizer(0,0)],
         [
@@ -426,9 +425,9 @@ class App:
 
     def draw_next(self):
         next = self.queue.next_target
-        if next is not None and self.queue.waiting:
+        if next is not None:
             self.draw(next[1], self.graph_next)
-            self.next_target_drew = next
+            self.last_next_target_drew = next
         else:
             self.graph_next.erase()
 
@@ -469,7 +468,7 @@ class App:
             self.window[FAST_TRACK_BTN].update(visible=self.setting_targets)
             # self.window[COLOR_BTN].update(visible=self.setting_targets and self.mode in [detectionMode.same, detectionMode.different, detectionMode.change])
 
-            self.window[PATIENCE_SLIDER].update(visible=not self.running)
+            self.window[PATIENCE_SLIDER].update(visible= not self.running)
             self.window[PATIENCE_PROGRESS].update(visible=self.running)
             self.window[PATIENCE_PROGRESS_2].update(visible=self.running)
 
@@ -510,7 +509,8 @@ class App:
 
         if self.queue.next_target is None:
             self.graph_next.erase()
-        elif (self.next_target_drew is None or self.next_target_drew != self.queue.next_target):
+            self.last_next_target_drew = None
+        elif (self.last_next_target_drew is None or self.last_next_target_drew != self.queue.next_target):
             self.draw_next()
 
     def update_target_table(self):
@@ -580,7 +580,7 @@ class App:
                 # self.window[COLOR_BTN].update(button_color = 'red', text='error')
         elif self.running and (x,y) not in self.queue.get_allowed_positions():
             self.aborted = True
-            self.window.bring_to_front()
+            # self.window.bring_to_front()
 
     def on_scroll(self, x, y, dx, dy):
         pass
@@ -641,16 +641,20 @@ class App:
 
     def update_patience_slider(self):
         if self.queue.has_tracker_targets():
+            self.window[PATIENCE_PROGRESS].update(visible=self.running)
+            self.window[PATIENCE_PROGRESS_2].update(visible=self.running)
+            self.window[PATIENCE_SLIDER].update(visible= not self.running)
+
             if not self.queue.waiting:
                 self.window[PATIENCE_PROGRESS_2].update(current_count=0, bar_color='blue')
                 self.window[PATIENCE_PROGRESS].update(current_count=self.queue.additionnal_wait, bar_color='blue')
-                last_click_id = self.queue.last_click.targetid if self.queue.last_click is not None else 'None'
+                # last_click_id = self.queue.last_click.targetid if self.queue.last_click is not None else 'None'
                 # self.window[NEXT_TARGET].update(value=f'Next Target ID: Waiting for target\nLast Target ID: {last_click_id}')
             else:
                 self.window[PATIENCE_PROGRESS].update(current_count=self.queue.additionnal_wait, bar_color='green')
                 self.window[PATIENCE_PROGRESS_2].update(current_count=self.queue.wait_prog, max=self.queue.patience_level, bar_color='green')
-                if self.queue.next_target is not None:
-                    last_click_id = self.queue.last_click.targetid if self.queue.last_click is not None else 'None'
+                # if self.queue.next_target is not None:
+                    # last_click_id = self.queue.last_click.targetid if self.queue.last_click is not None else 'None'
                     # self.window[NEXT_TARGET].update(value=f'Next Target ID: {self.queue.next_target[1].targetid}\nLast Target ID: {last_click_id}')
         else:
             self.window[PATIENCE_PROGRESS_2].update(visible=False)
@@ -663,11 +667,12 @@ class App:
         self.running = True
         self.aborted = False
 
-        self.update_buttons()
 
         self.autosave()
 
         self.queue.start()
+        
+        self.update_buttons()
 
         while not self.aborted:
             time.sleep(1)
@@ -709,7 +714,7 @@ class App:
 
         value = values[UI_UPDATE]
         if value != '':
-            if value.isdigit() and int(value) > 1:
+            if value.isdigit() and int(value) >= 1:
                 self.settings.ui_update = int(value)
                 self.window[UI_UPDATE_CUR].update(value=self.settings.ui_update)
             else:
@@ -775,7 +780,7 @@ class App:
             self.click_listener_thread.start()
 
             while True:
-                timeout = 1000 if not self.running else self.settings.ui_update
+                timeout = 250 if not self.running else self.settings.ui_update
                 event, values = self.window.read(timeout=timeout, timeout_key='NA')
                 if event != 'NA':
                     print(f'INFO - UI.run() - Handling event [{event}]')
@@ -784,6 +789,10 @@ class App:
                 # presses the OK button
                 if event in [sg.WIN_CLOSED, 'CLOSE', 'OK']:
                     break
+
+                # if self.running:
+                #     self.eventgraph.add_entry(EventEntry(time.time(), 'UI_update'))
+
 
                 if self.queue.has_update:
                     self.queue.has_update = False

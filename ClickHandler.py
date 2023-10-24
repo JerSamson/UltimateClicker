@@ -109,6 +109,7 @@ class ClickHandler:
     #         self.get_from_queue()
 
     def stop(self):
+        self.next_target=None
         self.running = False
         self.handling_one = False
         self.eventgraph.clear_entries()
@@ -213,10 +214,15 @@ class ClickHandler:
             self.click_queue.clean_queue()
             self.change_if_higher_priority()
 
+            if self.click_queue.is_in_queue(self.next_target):
+                self.next_target = None 
+
             if self.next_target is not None and self.next_target[1].priority == self.top_priority:
                 # self.clear_patience()
                 self.handle_task(self.next_target)
                 self.click_queue.clean_queue()
+                if self.click_queue.is_in_queue(self.next_target):
+                    self.next_target = None 
                 break
 
             add_wait = self.get_additionnal_wait()
@@ -229,8 +235,8 @@ class ClickHandler:
     
     def add_event_entry(self, name):
         ts = time.time()
-        print(f'INFO - ClickHandler.Add_event_entry - Adding entry at timestamp {round(ts,2)}')
-        self.eventgraph.add_entry(EventEntry(ts, name))
+        self.eventgraph.add_event_entry(EventEntry(ts, name))
+        print(f'INFO - ClickHandler.Add_event_entry - Added {name} entry at timestamp {round(ts,2)}')
 
         # self.event_history.append((ts, name))
 
@@ -240,9 +246,10 @@ class ClickHandler:
         while self.running:
             try:
                 self.add_event_entry('update_thread')
-                print('INFO - ClickHandler.update_thread() looped')
+                print('INFO - ClickHandler.update_thread() looped =========================================')
+                screenshot = np.array(ImageGrab.grab())
                 for tar in self.targets:
-                    if not isinstance(tar, FastTarget) and tar.enabled and tar.check_trigger():
+                    if not isinstance(tar, FastTarget) and tar.enabled and tar.check_trigger(screenshot):
                         if self.next_target is None or tar is not self.next_target[1]:
                             if self.add_to_queue_if_new((tar.priority, tar)):
                                 self.increment_patience(1, tar)
@@ -256,6 +263,9 @@ class ClickHandler:
                             Thread(target=self.handle_one, name='HandleOne', daemon=True).start()
 
                     self.targets = self.click_queue.clean_queue(self.targets)
+                    if self.click_queue.is_in_queue(self.next_target):
+                        self.next_target = None 
+
             except Exception as e:
                 print(f'ERROR - ClickHandler.update_thread() - thread failed ({e})')
             tracker_Interval = self.settings.trigger_check_rate if self.settings.trigger_check_rate is not None else self.patience_level if self.patience_level > 0 else 1 #self.patience_level/2
@@ -273,6 +283,8 @@ class ClickHandler:
         result = False
         try:
             self.handle_lock.acquire()
+            if not isinstance(task, FastTarget):
+                self.add_event_entry('HandleOne')
             result = task.handle()
         except Exception as e:
             print(f'Task was too much to handle ({e})')
@@ -346,7 +358,6 @@ class ClickHandler:
 
     def handle_one(self):
         try:
-            self.add_event_entry('HandleOne')
             print('INFO - ClickHandler.handle_one() thread started')
             self.handling_one = True
             self.next_target = self.get_from_queue()
@@ -359,7 +370,6 @@ class ClickHandler:
                     self.wait_additionnal_time()
 
                 if self.next_target is not None:
-
                     if self.handle_task(self.next_target[1]):
                         self.last_click = self.next_target[1]
                     else:
@@ -370,6 +380,9 @@ class ClickHandler:
                     self.handling_one = False
 
                 self.click_queue.clean_queue()
+                if self.click_queue.is_in_queue(self.next_target):
+                    self.next_target = None 
+
         except Exception as e:
             print(f'ERROR - ClickHandler.handle_one() thread failed ({e})')
             raise e
@@ -421,10 +434,6 @@ class ClickHandler:
             self.impatientThread.join()
             print('INFO - ClickHandler.run() - Impatient thread finished ')
 
-
-
-
         self.stop()
-        self.next_target=None
 
         print('INFO - ClickHandler.Run() thread finished')

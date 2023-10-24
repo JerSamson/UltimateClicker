@@ -1,4 +1,6 @@
 from queue import *
+import numpy as np
+import pyscreenshot as ImageGrab
 
 class UnitQueue(Queue):
     def __init__(self, maxsize: int = 1) -> None:
@@ -52,8 +54,9 @@ class ClickQueue(PriorityQueue):
         If another queue is passed, it will update it at the same time.
     '''
         with self.mutex:
+            screenshot = np.array(ImageGrab.grab())
             for t in self.queue:
-                if not t[1].check_trigger() or t[1].handled:
+                if not t[1].check_trigger(screenshot) or t[1].handled:
                     if set2 is not None and t[1] in set2:
                         idx = set2.index(t[1])
                         set2[idx] = t[1]

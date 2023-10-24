@@ -3,10 +3,9 @@ import io
 import os
 import time
 import math
-from enum import Enum
 from threading import Thread
-import getpixelcolor
-import win32api, win32con
+from PIL import Image
+import win32api
 import pyscreenshot as ImageGrab
 import pyautogui
 # from pynput import mouse
@@ -19,7 +18,7 @@ from event_graph import EventGraph, CpsEntry
 
 from Settings import Settings
 
-from numba import jit, cuda
+from numba import jit
 import numpy as np
 
 import mouse
@@ -35,7 +34,7 @@ IMAGE_SIZE_X = 150
 IMAGE_SIZE_Y = 30
 
 class BaseTarget(object):
-    def __init__(self, x, y, info_freq=0, active=False):
+    def __init__(self, x, y, info_freq=0, active=False, og_screenshot=None):
         self.settings = Settings()
         self.x = x
         self.y = y
@@ -85,6 +84,7 @@ class BaseTarget(object):
         self.handled=True
         if self.infoTask is not None:
             self.infoTask.stop()
+        print(f'INFO - TARGET[{self.targetid}] - Stop. Now Inactive.')
 
     def start(self):
         self.active=True
@@ -92,6 +92,7 @@ class BaseTarget(object):
         if self.info_freq > 0:
             self.infoTask = RepeatedTimer(self.info_freq, self.info, name=f'InfoTarget{self.targetid}')
         else: self.infoTask = None
+        print(f'INFO - TARGET[{self.targetid}] - Started. Now Active.')
 
     def to_csv(self):
         raise NotImplementedError()
@@ -174,7 +175,8 @@ class FastTarget(BaseTarget):
         self.highest_cps  = 0
         self.last_handle  = time.time()
         self.last_nb_clicks = 0
-        self.pid = PID(-0.00000025, -0.000025, 0, output_limits=(0,1))
+        self.pid = PID(-0.0000005, -0.000050, -0.00000000125, output_limits=(0.00001,1))
+        # self.pid = PID(-0.00000005, -0.000025, -0.000000000, output_limits=(0.00001,1))
         self.last_cps_time = 0
         self.start_time       = time.time()
         self.eventgraph = EventGraph()
@@ -207,7 +209,8 @@ class FastTarget(BaseTarget):
             self.first_click_time = time.time()
             if self.settings.target_cps> 0:
                 self.pid.setpoint = self.settings.target_cps
-                self.pid.output_limits = (0.5/self.settings.target_cps, 1)
+                self.pid.output_limits = (0, 1)
+                # self.pid.output_limits = (0.5/self.settings.target_cps, 1)
         # self.nb_clicks = self.nb_clicks + 1
         return super().click()
 
@@ -242,6 +245,7 @@ class FastTarget(BaseTarget):
         self.avg_cps = 0
         self.n_cps_sample = 0
         self.first_click_time = 0
+        self.pid.reset()
         return super().start()
 
     def info(self):
@@ -269,7 +273,6 @@ class FastTarget(BaseTarget):
 
             if time.time() - self.last_cps_time > self.settings.cps_update_delay:
                 self.update_cps()
-                # self.tweak_delay()
 
             self.last_handle = time.time()
 
@@ -288,7 +291,7 @@ class FastTarget(BaseTarget):
 
         # print(f'INFO - FASTTARGET - Relative Timestamp: {relative_timestamp}')
         
-        self.eventgraph.add_entry(CpsEntry(now, self.cps))
+        self.eventgraph.add_cps_entry(CpsEntry(now, self.cps))
 
         # self.cps_history.append([relative_timestamp, self.cps, actual_timestamp])
 
@@ -299,7 +302,7 @@ class FastTarget(BaseTarget):
         if self.times_clicked > 100:
             self.approxCpsAverage(self.cps)
 
-        if self.settings.target_cps> 0:
+        if self.settings.target_cps > 0:
             self.delay = self.pid(self.cps)
 
 
@@ -338,15 +341,17 @@ class TrackerTarget(BaseTarget):
     def is_ready(self):
         return self.acquired
 
-    def get_ref_area(self):
+    def get_ref_area(self, screenshot=None):
         try:
             res = pyautogui.size()
             x1 = self.x - IMAGE_SIZE_X if self.x > IMAGE_SIZE_X else 0
             x2 = self.x + IMAGE_SIZE_X if self.x + IMAGE_SIZE_X < res[0] else res[0]
             y1 = self.y - IMAGE_SIZE_Y if self.y > IMAGE_SIZE_Y else 0
             y2 = self.y + IMAGE_SIZE_Y if self.y + IMAGE_SIZE_Y < res[1] else res[1]
-
-            im=ImageGrab.grab(bbox=(x1, y1, x2, y2))
+            if screenshot is None:
+                im=ImageGrab.grab(bbox=(x1, y1, x2, y2))
+            else:
+                im = Image.fromarray(screenshot, 'RGB').crop((x1, y1, x2, y2))
 
             buffer = io.BytesIO()
             im.save(buffer, format='PNG')
@@ -357,19 +362,26 @@ class TrackerTarget(BaseTarget):
             self.ref_area = None
             pass # Minor repercussions
 
-    def get_color(self):
-        return getpixelcolor.average(self.x, self.y, self.zone_area, self.zone_area)
+    @jit(target_backend='cuda', forceobj=True)
+    def get_color(self, screenshot=None):
+        if screenshot is None:
+            screenshot = np.array(ImageGrab.grab())
+        img=Image.fromarray(screenshot, 'RGB').crop((int(self.x-self.zone_area/2), int(self.y-self.zone_area/2), int(self.x+self.zone_area/2), int(self.y+self.zone_area/2))).getcolors()
+        return img
 
+    @jit(target_backend='cuda', forceobj=True)
     def color_acquisition(self):
         x,y = win32api.GetCursorPos()
         while (abs(self.x-x) <= self.acquisition_min_dist and abs(self.y-y) <= self.acquisition_min_dist):
             time.sleep(0.2)
             x,y = win32api.GetCursorPos()
 
+        screenshot = np.array(ImageGrab.grab())
+        
         # Get ref area
-        self.get_ref_area()
+        self.get_ref_area(screenshot)
 
-        self.color = self.get_color()
+        self.color = self.get_color(screenshot)
         self.acquired = True
         self.waiting_acquisition = False
 
@@ -378,7 +390,7 @@ class TrackerTarget(BaseTarget):
         self.acquired = False
         Thread(target=self.color_acquisition, daemon=True, name='bg_color_acquisition').start()
 
-    def check_trigger(self):
+    def check_trigger(self, screenshot=None):
 
         if time.time() - self.last_handle < self.delay_after_handle_2_trigger:
             print(f'WARN - TARGET[{self.targetid}] - Too soon after handling to check trigger to avoid capturing the cursor. Skipping')
@@ -388,21 +400,23 @@ class TrackerTarget(BaseTarget):
             raise Exception(f'Tried to check trigger before ref was acquired (TARGET[{self.targetid}])')
 
         old_value = self.triggered
-        cur_color = self.get_color()
+        cur_color = self.get_color(screenshot)
 
         if cur_color == (30, 30, 30):
             print('THATS MY CURSOR BITCH STOP STOP')
             return False
 
         if self.mode == detectionMode.same:
-            self.triggered = self.compare_color(cur_color)
+            self.triggered = cur_color == self.color
+            # self.triggered = self.compare_color(cur_color)
         elif self.mode in [detectionMode.different, detectionMode.change]:
-            self.triggered = not self.compare_color(cur_color)
+            self.triggered = cur_color != self.color
+            # self.triggered = not self.compare_color(cur_color)
         else:
             raise Exception('Unsupported trigger mode')
 
         if (not old_value and self.triggered): # Has become triggered
-            print(f'INFO - TARGET[{self.targetid}] has triggered. now:{cur_color} ref:{self.color}')
+            print(f'INFO - TARGET[{self.targetid}] has triggered.')# now:{cur_color} ref:{self.color}')
             self.handled = False
             # print(f'Target {self.targetid} triggered.\n\tcur:{cur_color} og:{self.color}')
 
