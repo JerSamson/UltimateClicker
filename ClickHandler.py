@@ -3,7 +3,7 @@ from threading import Lock, Thread
 import time
 from ClickQueue import *
 from screenshot import SEEK_GOLDEN_COOKIES
-
+from screenrecorder import ScreenRecorder
 from Settings import Settings
 from event_graph import EventGraph, EventEntry
 
@@ -22,7 +22,6 @@ from event_graph import EventGraph, EventEntry
 class SelfDestructException(Exception):
     pass
 
-pyautogui.PAUSE = 0
 
 class ClickHandler:
     def __init__(self) -> None:
@@ -52,7 +51,6 @@ class ClickHandler:
         self.impatientThread = None
         self.last_golden_cookie_pos = None
         self.golden_clicked = 0
-
         self.settings = Settings()
         self.eventgraph = EventGraph()
 
@@ -65,12 +63,13 @@ class ClickHandler:
         if delay <= 1:
             time.sleep(delay)
         else:
-            for i in range(delay):
+            for i in range(math.floor(delay)):
                 for j in range(self.wait_resolution):
                     time.sleep(1/self.wait_resolution)
                     if not self.running:
                         print('INFO - Aborted wait because ClickHandler is not running anymore')
                         return
+            time.sleep(delay%1)
 
     def clear_patience(self):
         with self.add_wait_lock:
@@ -240,14 +239,32 @@ class ClickHandler:
 
         # self.event_history.append((ts, name))
 
+    def try_handle_one(self):
+        if not self.click_queue.is_empty() and not self.OneQueue.has_one():
+            if self.OneQueue.tryPut(self.next_target):
+                print(f'INFO - Starting handling thread (predicted ID: {self.click_queue.first_id()})')
+                self.increment_patience(1)
+                Thread(target=self.handle_one, name='HandleOne', daemon=True).start()
+
+        self.targets = self.click_queue.clean_queue(self.targets)
+        if self.click_queue.is_in_queue(self.next_target):
+            self.next_target = None 
+
     def update_thread(self, patient=True):
         print('INFO - ClickHandler.update_thread() thread started')
+        
+        # target_max_x = max([(tar.x + tar.zone_area) for tar in self.targets if isinstance(tar, TrackerTarget)])
+        # target_max_y = max([(tar.y + tar.zone_area) for tar in self.targets if isinstance(tar, TrackerTarget)])
 
         while self.running:
+            start = time.time()
             try:
                 self.add_event_entry('update_thread')
                 print('INFO - ClickHandler.update_thread() looped =========================================')
-                screenshot = np.array(ImageGrab.grab())
+                screenshot = np.array(ScreenRecorder().get_screen())
+                print(f'DEBUG - Update_thread() - Getting screenshot took {round(time.time()-start,2)}s =-=--=-=-=-=-=-=')
+                
+                checking_trig_start = time.time()
                 for tar in self.targets:
                     if not isinstance(tar, FastTarget) and tar.enabled and tar.check_trigger(screenshot):
                         if self.next_target is None or tar is not self.next_target[1]:
@@ -255,21 +272,24 @@ class ClickHandler:
                                 self.increment_patience(1, tar)
                                 self.has_update = True
 
-                if self.patience_level > 0:
-                    if not self.click_queue.is_empty() and not self.OneQueue.has_one():
-                        if self.OneQueue.tryPut(self.next_target):
-                            print(f'INFO - Starting handling thread (predicted ID: {self.click_queue.first_id()})')
-                            self.increment_patience(1)
-                            Thread(target=self.handle_one, name='HandleOne', daemon=True).start()
+                print(f'DEBUG - Update_thread() - checking triggers took {round(time.time()-checking_trig_start,2)}s =-=--=-=-=-=-=-=')
 
-                    self.targets = self.click_queue.clean_queue(self.targets)
-                    if self.click_queue.is_in_queue(self.next_target):
-                        self.next_target = None 
+                if self.patience_level > 0:
+                    Thread(target=self.try_handle_one, name='TryHandleOne', daemon=True).start()
 
             except Exception as e:
                 print(f'ERROR - ClickHandler.update_thread() - thread failed ({e})')
+
             tracker_Interval = self.settings.trigger_check_rate if self.settings.trigger_check_rate is not None else self.patience_level if self.patience_level > 0 else 1 #self.patience_level/2
-            self.wait(tracker_Interval)
+
+            stop = time.time()
+
+            actual_wait_time = tracker_Interval - (stop-start)
+            print(f'DEBUG - Update_thread() - Took {round(stop-start, 2)}s - Waiting time is {actual_wait_time}s =-=--=-=-=-=-=-=')
+
+            if actual_wait_time > 0:
+                self.wait(actual_wait_time)
+
         print('INFO - ClickHandler.update_thread() thread finished')
 
 
@@ -317,7 +337,6 @@ class ClickHandler:
     @jit(target_backend='cuda', forceobj=True)
     def SeekAndClickGOOOOLD(self):
         print('INFO - ClickHandler.SeekAndClickGOOOOLD() - GOLD DIGGER thread started ')
-        streak = False
         normal_wait = 5
         streak_cnt = 0
 
@@ -341,7 +360,10 @@ class ClickHandler:
                         print(f'INFO - ClickHandler.SeekAndClickGOOOOLD() - STREAK - Updated delay between check to {normal_wait-streak_cnt}s')
                 else:
                     if streak_cnt >= 1:
-                        streak_cnt -= 1
+                        if streak_cnt >= 2:
+                            streak_cnt -= 2
+                        else:
+                            streak_cnt -= 1
                         print(f'INFO - ClickHandler.SeekAndClickGOOOOLD() - NON STREAK - Updated delay between check to {normal_wait-streak_cnt}s')
 
                     print('INFO - Dismissing golden cookie because it seems to be the same as the last one detected')

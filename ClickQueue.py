@@ -1,6 +1,7 @@
 from queue import *
 import numpy as np
-import pyscreenshot as ImageGrab
+
+from screenrecorder import ScreenRecorder
 
 class UnitQueue(Queue):
     def __init__(self, maxsize: int = 1) -> None:
@@ -17,6 +18,9 @@ class UnitQueue(Queue):
             return False
 
 class ClickQueue(PriorityQueue):
+    def __init__(self, maxsize: int = 0) -> None:
+        super().__init__(maxsize)
+        
     def get_current_queue(self):
         with self.mutex:
             return self.queue
@@ -54,7 +58,7 @@ class ClickQueue(PriorityQueue):
         If another queue is passed, it will update it at the same time.
     '''
         with self.mutex:
-            screenshot = np.array(ImageGrab.grab())
+            screenshot = np.array(ScreenRecorder().get_screen())
             for t in self.queue:
                 if not t[1].check_trigger(screenshot) or t[1].handled:
                     if set2 is not None and t[1] in set2:

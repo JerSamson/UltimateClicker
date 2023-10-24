@@ -1,4 +1,3 @@
-from genericpath import isfile
 from threading import Lock, Thread, Timer
 import PySimpleGUI as sg
 from DetectionMode import detectionMode
@@ -11,8 +10,6 @@ import os
 
 from Settings import Settings
 from event_graph import *
-
-pyautogui.PAUSE = 0
 
 millnames = ['',' Thousand',' Million',' Billion',' Trillion']
 
@@ -134,7 +131,7 @@ class App:
         fast_tab=[[sg.Text('FAST',  size=(self.tab_size_x, self.tab_size_y))]]
 
         # =========================== SETTINGS TAB ===========================
-        text_width = 16
+        text_width = 20
         settings_tab=[
             [sg.Text('Saves Dir', size=(text_width,1), tooltip='Directory to load and save data'), sg.InputText(key=SAVE_FOLDER, size=(15,1)), sg.Text(key=SAVE_FOLDER_CUR, text=self.settings.save_dir, text_color='light gray', auto_size_text=True)], 
             [sg.Text('Target zone (px)', size=(text_width,1), tooltip='Height and width (px) of the area used to check if target has triggered.'), sg.InputText(key=TARGET_ZONE, size=(15,1)), sg.Text(key=TARGET_ZONE_CUR, text=self.settings.target_zone, text_color='light gray', auto_size_text=True)], 

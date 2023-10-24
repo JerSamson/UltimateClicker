@@ -23,12 +23,13 @@ import numpy as np
 
 import mouse
 
+from screenrecorder import ScreenRecorder
+
 
 def click_mouse(x, y, button):
     mouse.move(x, y, absolute=True)
     mouse.click(button=button)
 
-pyautogui.PAUSE = 0
 
 IMAGE_SIZE_X = 150
 IMAGE_SIZE_Y = 30
@@ -134,7 +135,7 @@ class IdleTarget(BaseTarget):
 
     def get_ref_area(self):
         try:
-            res = pyautogui.size()
+            res = pyautogui.size() #TODO change that
             x1 = self.x - IMAGE_SIZE_X if self.x > IMAGE_SIZE_X else 0
             x2 = self.x + IMAGE_SIZE_X if self.x + IMAGE_SIZE_X < res[0] else res[0]
             y1 = self.y - IMAGE_SIZE_Y if self.y > IMAGE_SIZE_Y else 0
@@ -216,11 +217,14 @@ class FastTarget(BaseTarget):
 
     def get_ref_area(self):
         try:
-            res = pyautogui.size()
+            res = pyautogui.size() #TODO change that
             x1 = self.x - IMAGE_SIZE_X if self.x > IMAGE_SIZE_X else 0
             x2 = self.x + IMAGE_SIZE_X if self.x + IMAGE_SIZE_X < res[0] else res[0]
             y1 = self.y - IMAGE_SIZE_Y if self.y > IMAGE_SIZE_Y else 0
             y2 = self.y + IMAGE_SIZE_Y if self.y + IMAGE_SIZE_Y < res[1] else res[1]
+
+            # im=ScreenRecorder().get_screen((x1, y1, x2, y2))
+            # self.ref_area = base64.b64encode(im)
 
             im=ImageGrab.grab(bbox=(x1, y1, x2, y2))
             buffer = io.BytesIO()
@@ -343,20 +347,23 @@ class TrackerTarget(BaseTarget):
 
     def get_ref_area(self, screenshot=None):
         try:
-            res = pyautogui.size()
+            res = pyautogui.size() #TODO change that
             x1 = self.x - IMAGE_SIZE_X if self.x > IMAGE_SIZE_X else 0
             x2 = self.x + IMAGE_SIZE_X if self.x + IMAGE_SIZE_X < res[0] else res[0]
             y1 = self.y - IMAGE_SIZE_Y if self.y > IMAGE_SIZE_Y else 0
             y2 = self.y + IMAGE_SIZE_Y if self.y + IMAGE_SIZE_Y < res[1] else res[1]
             if screenshot is None:
                 im=ImageGrab.grab(bbox=(x1, y1, x2, y2))
+                # self.ref_area = base64.b64encode(im)
             else:
+                # im=screenshot[x1:x2, y1:y2]
                 im = Image.fromarray(screenshot, 'RGB').crop((x1, y1, x2, y2))
-
+                
             buffer = io.BytesIO()
             im.save(buffer, format='PNG')
             im.close()
             self.ref_area = base64.b64encode(buffer.getvalue())
+
         except Exception as e:
             print(f'ERROR - TRACKER - get_ref_area ({e})')
             self.ref_area = None
@@ -376,12 +383,12 @@ class TrackerTarget(BaseTarget):
             time.sleep(0.2)
             x,y = win32api.GetCursorPos()
 
-        screenshot = np.array(ImageGrab.grab())
+        # screenshot = ScreenRecorder().get_screen()
         
         # Get ref area
-        self.get_ref_area(screenshot)
+        self.get_ref_area()
 
-        self.color = self.get_color(screenshot)
+        self.color = self.get_color()
         self.acquired = True
         self.waiting_acquisition = False
 

@@ -3,12 +3,13 @@ import re
 import cv2
 import time
 import os
-from PIL import ImageGrab
 from PIL import Image
 from pywinauto import mouse
 from pywinauto.application import Application
 from Target import GOLDENTARGET
 import numpy as np 
+
+from screenrecorder import ScreenRecorder
 
 THRESHOLD_VALUE = 127  # Tweak as needed
 # The reference image of the golden cookie
@@ -38,10 +39,19 @@ def get_cookie_clicker_screenshot():
     x, y, width, height = window.rectangle().left, window.rectangle(
     ).top, window.rectangle().width(), window.rectangle().height()
     # print("Window position is (", x, ",", y, ")")
-    img = ImageGrab.grab(
-        bbox=(x, y, x + width, y + height)).convert('L')
-    img = np.array(img)
+    if x < 0:
+        x = 0
+    if y < 0:
+        y = 0
+
+    img = ScreenRecorder().get_screen(region=(x, y, x + width, y + height))
+        
+    
+    img = np.dot(img[...,:3], [0.2989, 0.5870, 0.1140])
+
     ret, img = cv2.threshold(img, THRESHOLD_VALUE, 255, cv2.THRESH_BINARY)
+    img = cv2.normalize(img, None, 0, 255, cv2.NORM_MINMAX).astype('uint8')
+
     return img
 
 def prepare_reference_image(image_path):
