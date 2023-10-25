@@ -178,7 +178,6 @@ class ClickHandler:
         return self.click_queue.get_if_any()
 
     def clear_targets(self):
-        self.stop()
         self.targets.clear()
         self.click_queue.empty_queue()
         self.next_target=None
@@ -470,6 +469,7 @@ class ClickHandler:
             self.impatientThread.join()
             print('INFO - ClickHandler.run() - Impatient thread finished ')
 
-        self.stop()
+        if self.running:
+            self.stop()
 
         print('INFO - ClickHandler.Run() thread finished')

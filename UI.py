@@ -966,8 +966,6 @@ class App:
                 elif event == TOGGLE_TABLE:
                     self.window[TARGET_TABLE].update(visible=not self.target_table.visible)
                 elif event == SUBMIT_SETTINGS:
-                    self.current_tab = TRACK_TAB
-                    self.update_tabs()
                     self.update_settings(values)
 
             self.click_listener_thread.stop()
