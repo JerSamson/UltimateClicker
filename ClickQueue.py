@@ -58,7 +58,7 @@ class ClickQueue(PriorityQueue):
         If another queue is passed, it will update it at the same time.
     '''
         with self.mutex:
-            screenshot = ScreenRecorder().get_screen()
+            screenshot = ScreenRecorder().get_screen(caller='ClickQueue.clean_queue()')
             for t in self.queue:
                 if not t[1].check_trigger(screenshot) or t[1].handled:
                     if set2 is not None and t[1] in set2:

@@ -82,7 +82,7 @@ class ClickHandler:
         
         self.add_wait_lock.acquire()
         try:
-            if self.additionnal_wait + inc < self.settings.max_patience_stack and self.additionnal_wait + inc >= 0:
+            if self.additionnal_wait + inc <= self.settings.max_patience_stack and self.additionnal_wait + inc >= 0:
                 self.additionnal_wait += inc
                 if tar is not None:
                     print(f'INFO - Added increment for target {tar.targetid}')
@@ -271,7 +271,7 @@ class ClickHandler:
             try:
                 self.add_event_entry('update_thread')
                 print('INFO - ClickHandler.update_thread() looped =========================================')
-                screenshot = self.cam.get_screen()
+                screenshot = self.cam.get_screen(caller='ClickHandler.UpdateThread()')
                 # print(f'DEBUG - Update_thread() - Getting screenshot took {round(time.time()-start,2)}s =-=--=-=-=-=-=-=')
                 
                 checking_trig_start = time.time()

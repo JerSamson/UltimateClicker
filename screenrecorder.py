@@ -7,9 +7,14 @@ class ScreenRecorder(metaclass=Singleton):
         self.cam = dxcam.create()
         self.lock = Lock()
 
-    def get_screen(self, region=None):
+    def get_screen(self, region=None, caller=''):
+        val = None
         with self.lock:
+            print(f'DEBUG - screenrecorder.get_screen() - LOCK ACQUIRED {"by " + caller if caller is not None else ""} <|><|><|><|>')
             if region is None:
-                return self.cam.grab()
+                val = self.cam.grab()
             else:
-                return self.cam.grab(region=region)
+                val = self.cam.grab(region=region)
+
+        print(f'DEBUG - screenrecorder.get_screen() - LOCK RELEASED by {"by " + caller if caller is not None else ""} <><><><><>')
+        return val

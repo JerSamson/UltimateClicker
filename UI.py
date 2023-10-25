@@ -51,15 +51,25 @@ CLEAR_BTN           = '-CLEAR-'
 BOTTOM_ROW_FRAME    = '-BOTTOM_ROW_FRAME-'
 ENABLED_COLOR       = ('black', 'green')
 DISABLED_COLOR      = ('black', 'red')
-PATIENCE_SLIDER     = '-PATIENCE-'
-PATIENCE_PROGRESS   = '-PATIENCE_SLIDE-'
-PATIENCE_PROGRESS_2 = '-PATIENCE_SLIDE_SMALLINC-'
+PATIENCE_SLIDER     = '-PATIENCE_SLIDER-'
+PATIENCE_PROGRESS   = '-PATIENCE_BIGINC-'
+PATIENCE_PROGRESS_2 = '-PATIENCE_SMALLINC-'
 NEXT_TARGET         = '-NEXT-'
 TOGGLE_TRACK        = '-TOGGLETRACK-'
 TOGGLE_TABLE        = '-TOGGLETABLE-'
 COLOR_PREVIEW_SIZE  = (10,2)
 
+TRACK_TAB        = '-TRACK_TAB-'
+
 #SETTINGS
+SETTINGS_TAB        = '-SETTINGS_TAB-'
+
+PATIENCE_FRAME = '-PATIENCEFRAME-'
+CPS_FRAME = '-CPSFRAME-'
+TRACKER_FRAME = '-TRACKERFRAME-'
+GENERAL_FRAME = '-GENERALFRAME-'
+COOKIE_FRAME = '-COOKIEFRAME-'
+
 SUBMIT_SETTINGS     = '-SUBMITSETTINGS'
 SAVE_FOLDER         = '-SAVEDIR-'
 SAVE_FOLDER_CUR     = '-SAVEDIRCUR-'
@@ -109,10 +119,9 @@ class App:
         self.targets = []
         self.all_targets_ready = False
         self.mode = detectionMode.fast
-
+        self.current_tab = None
         self.cwd = os.path.dirname(os.path.realpath(__file__)) + '\\'
         self.last_save_file = 'last_save'
-
         self.track_target_lock = Lock()
         self.selected_target = None
         self.last_target_drew = None
@@ -142,40 +151,40 @@ class App:
             [sg.Text('Max patience', size=(text_width,1), tooltip='When using trackers, patience will prevent the clicker to simply click as soon as its triggered.\nEach newly triggered target add 1 stack. Each stack will take <<patience level>> sec to deplete.'), sg.InputText(key=MAX_PATIENCE, size=(15,1)), sg.Text(key=MAX_PATIENCE_CUR, text=self.settings.max_patience, text_color='light gray', auto_size_text=True)], 
             [sg.Text('Max patience Stack', size=(text_width,1), tooltip='Patience stack that would bring the queued up delay to exceed this value will be ignored.'), sg.InputText(key=MAX_PATIENCE_STACK, size=(15,1)), sg.Text(key=MAX_PATIENCE_STACK_CUR, text=self.settings.max_patience_stack, text_color='light gray', auto_size_text=True)],
         ]
-        patience_settings_frame = [sg.Frame('Patience', patience_settings, visible=True, expand_x=True, title_color=setting_frame_title_color)]
+        self.patience_settings_frame = [sg.Image(size=(0, 0))] + [sg.Frame('Patience', patience_settings, key=PATIENCE_FRAME, visible=False, expand_x=True, title_color=setting_frame_title_color)]
 
         cps_settings = [
             [sg.Text('Target CPS', size=(text_width,1), tooltip='Setpoint for CPS pid of fast trgets.'), sg.InputText(key=TARGET_CPS, size=(15,1)), sg.Text(key=TARGET_CPS_CUR, text=self.settings.target_cps, text_color='light gray', auto_size_text=True)], 
             [sg.Text('CPS Update Delay (s)', size=(text_width,1), tooltip='Delay between cps update (fast targets).'), sg.InputText(key=CPS_UPDATE, size=(15,1)), sg.Text(key=CPS_UPDATE_CUR, text=self.settings.cps_update_delay, text_color='light gray', auto_size_text=True)], 
         ]
-        cps_settings_frame = [sg.Frame('FastClick', cps_settings, visible=True, expand_x=True, title_color=setting_frame_title_color)]
+        self.cps_settings_frame = [sg.Image(size=(0, 0))] + [sg.Frame('FastClick', cps_settings, key=CPS_FRAME, visible=False, expand_x=True, title_color=setting_frame_title_color)]
 
         tracker_settings = [
             [sg.Text('Trigger check rate (s)', size=(text_width,1), tooltip='Delay (s) between trigger checks (Same as current patience level by default)\nLow values can affect performances'), sg.InputText(key=TRIGGER_CHECK_RATE, size=(15,1)), sg.Text(key=TRIGGER_CHECK_RATE_CUR, text=f'{"Same as patience" if self.settings.trigger_check_rate is None else self.settings.trigger_check_rate}', text_color='light gray', auto_size_text=True)], 
             [sg.Text('Target zone (px)', size=(text_width,1), tooltip='Height and width (px) of the area used to check if target has triggered.'), sg.InputText(key=TARGET_ZONE, size=(15,1)), sg.Text(key=TARGET_ZONE_CUR, text=self.settings.target_zone, text_color='light gray', auto_size_text=True)], 
         ]
-        tracker_settings_frame = [sg.Frame('Tracker', tracker_settings, visible=True, expand_x=True, title_color=setting_frame_title_color)]
+        self.tracker_settings_frame = [sg.Image(size=(0, 0))] + [sg.Frame('Tracker', tracker_settings, key=TRACKER_FRAME , visible=False, expand_x=True, title_color=setting_frame_title_color)]
 
         general_settings = [
             [sg.Text('Saves Dir', size=(text_width,1), tooltip='Directory to load and save data'), sg.InputText(key=SAVE_FOLDER, size=(15,1)), sg.Text(key=SAVE_FOLDER_CUR, text=self.settings.save_dir, text_color='light gray', auto_size_text=True)], 
             [sg.Text('UI refresh (ms)', size=(text_width,1), tooltip='Delay (ms) between UI refresh while running.\nLow values can affect performances'), sg.InputText(key=UI_UPDATE, size=(15,1)), sg.Text(key=UI_UPDATE_CUR, text=self.settings.ui_update, text_color='light gray', auto_size_text=True)], 
         ]
-        general_settings_frame = [sg.Frame('General', general_settings, visible=True, expand_x=True, title_color=setting_frame_title_color)]
+        self.general_settings_frame = [sg.Image(size=(0, 0))] + [sg.Frame('General', general_settings, key=GENERAL_FRAME, visible=False, expand_x=True, title_color=setting_frame_title_color)]
 
         cookie_settings = [
-            [sg.Checkbox(default=self.settings.check_for_gold_cookie, text='GOLD DIGGER', key=GOLD_DIGGER, size=(text_width,1), tooltip='If selected, will periodically check and queue up golden cookies\n(For Cookie Clicker game)'),sg.Text(key=GOLD_DIGGER_CUR, text=f'{"CLICKING GOLD!!!" if self.settings.check_for_gold_cookie else "Nope.. T_T"}', text_color='light gray', auto_size_text=True)], 
             [sg.Text('Check freq (s)', size=(text_width,1), tooltip='Delay (s) between gold cookie seek'), sg.InputText(key=GOLD_FREQ, size=(15,1)), sg.Text(key=GOLD_FREQ_CUR, text=self.settings.check_for_gold_freq, text_color='light gray', auto_size_text=True)], 
+            [sg.Checkbox(default=self.settings.check_for_gold_cookie, text='GOLD DIGGER', key=GOLD_DIGGER, size=(text_width,1), tooltip='If selected, will periodically check and queue up golden cookies\n(For Cookie Clicker game)'),sg.Text(key=GOLD_DIGGER_CUR, text=f'{"CLICKING GOLD!!!" if self.settings.check_for_gold_cookie else "Nope.. T_T"}', text_color='light gray', auto_size_text=True)], 
         ]
-        cookie_settings_frame = [sg.Frame('Cookie Clicker', cookie_settings, visible=True, expand_x=True, title_color=setting_frame_title_color)]
+        self.cookie_settings_frame = [sg.Image(size=(0, 0))] + [sg.Frame('Cookie Clicker', cookie_settings, key=COOKIE_FRAME , visible=False, expand_x=True, title_color=setting_frame_title_color)]
 
 
-        settings_tab=[
-            general_settings_frame,
-            tracker_settings_frame,
-            patience_settings_frame,
-            cps_settings_frame,
-            cookie_settings_frame,
-            [sg.Button(button_text='Update', key=SUBMIT_SETTINGS)]
+        settings_tab= [
+            self.general_settings_frame,
+            self.tracker_settings_frame,
+            self.patience_settings_frame,
+            self.cps_settings_frame,
+            self.cookie_settings_frame,
+            [sg.Button(button_text='Update', key=SUBMIT_SETTINGS), sg.Sizer(0,0)],
             ]
 
         # =========================== RIGHT CLICK MENU ===========================
@@ -242,16 +251,6 @@ class App:
                 enable_events=True,
                 drag_submits=False, key=NEXT_IMAGE_KEY,
                 expand_x=True, expand_y=True)
-        
-        # TODO
-        # self.graph_cps = sg.Graph(canvas_size=(500, 100),
-        #         graph_bottom_left=(0, 0),
-        #         graph_top_right=(60, 1000),
-        #         enable_events=True,
-        #         drag_submits=False, key=EVENT_GRAPH,
-        #         expand_x=False, expand_y=True,
-        #         background_color='white',
-        #         visible=False)
 
         last_frame = [self.graph_last]
         next_frame = [self.graph_next]
@@ -303,8 +302,8 @@ class App:
         layout = [
             [sg.Sizer(0,0)],
             [sg.TabGroup([[
-                sg.Tab('Track', track_tab,element_justification='center'),
-                sg.Tab('Settings', settings_tab, element_justification='left')
+                sg.Tab('Track', track_tab, key=TRACK_TAB, element_justification='center'),
+                sg.Tab('Settings', settings_tab, key=SETTINGS_TAB, element_justification='left')
             ]])],
             [sg.Sizer(0,0)],
         [
@@ -515,6 +514,16 @@ class App:
                 return False
         return True
 
+    def update_tabs(self):
+        settings_visible = self.current_tab == SETTINGS_TAB
+        print(f'INFO - UI.update_tabs() - Settings tabs are now {"visible" if settings_visible else "hidden"}')
+        self.window[PATIENCE_FRAME].update(visible=settings_visible)
+        self.window[CPS_FRAME].update(visible=settings_visible)
+        self.window[TRACKER_FRAME].update(visible=settings_visible)
+        self.window[GENERAL_FRAME].update(visible=settings_visible)
+        self.window[COOKIE_FRAME].update(visible=settings_visible)
+        self.window[SUBMIT_SETTINGS].update(visible=settings_visible)
+
     def update_buttons(self):
         try:
             self.window[MODE_SAME_BTN].update(button_color = ENABLED_COLOR if self.mode == detectionMode.same else DISABLED_COLOR)
@@ -712,7 +721,7 @@ class App:
                 # last_click_id = self.queue.last_click.targetid if self.queue.last_click is not None else 'None'
                 # self.window[NEXT_TARGET].update(value=f'Next Target ID: Waiting for target\nLast Target ID: {last_click_id}')
             else:
-                self.window[PATIENCE_PROGRESS].update(current_count=self.queue.additionnal_wait, bar_color='green')
+                self.window[PATIENCE_PROGRESS].update(current_count=self.queue.additionnal_wait, bar_color='green', max=self.settings.max_patience_stack)
                 self.window[PATIENCE_PROGRESS_2].update(current_count=self.queue.wait_prog, max=self.queue.patience_level, bar_color='green')
                 # if self.queue.next_target is not None:
                     # last_click_id = self.queue.last_click.targetid if self.queue.last_click is not None else 'None'
@@ -856,6 +865,13 @@ class App:
                 if event != 'NA':
                     print(f'INFO - UI.run() - Handling event [{event}]')
 
+                if values[5] == SETTINGS_TAB and self.current_tab != SETTINGS_TAB:
+                    self.current_tab = SETTINGS_TAB
+                    self.update_tabs()
+                if values[5] == TRACK_TAB and self.current_tab != TRACK_TAB:
+                    self.current_tab = TRACK_TAB
+                    self.update_tabs()
+
                 # End program if user closes window or
                 # presses the OK button
                 if event in [sg.WIN_CLOSED, 'CLOSE', 'OK']:
@@ -950,6 +966,8 @@ class App:
                 elif event == TOGGLE_TABLE:
                     self.window[TARGET_TABLE].update(visible=not self.target_table.visible)
                 elif event == SUBMIT_SETTINGS:
+                    self.current_tab = TRACK_TAB
+                    self.update_tabs()
                     self.update_settings(values)
 
             self.click_listener_thread.stop()

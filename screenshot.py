@@ -44,7 +44,7 @@ def get_cookie_clicker_screenshot():
     if y < 0:
         y = 0
 
-    img = ScreenRecorder().get_screen(region=(x, y, x + width, y + height))
+    img = ScreenRecorder().get_screen(region=(x, y, x + width, y + height), caller='screenshot.get_cookie_clicker_screenshot()')
         
     
     img = np.dot(img[...,:3], [0.2989, 0.5870, 0.1140])
