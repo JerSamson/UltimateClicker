@@ -347,7 +347,7 @@ class ClickHandler:
     # @jit(target_backend='cuda', forceobj=True)
     def SeekAndClickGOOOOLD(self):
         print('INFO - ClickHandler.SeekAndClickGOOOOLD() - GOLD DIGGER thread started ')
-        normal_wait = 5
+        normal_wait = self.settings.check_for_gold_freq
         streak_cnt = 0
 
         while self.running:

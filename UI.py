@@ -76,6 +76,9 @@ TRIGGER_CHECK_RATE_CUR   = '-TRIGGERCHECKCUR-'
 GOLD_DIGGER          = '-GOLDDIG'
 GOLD_DIGGER_CUR      = '-GOLDDIGCUR'
 
+GOLD_FREQ                 = '-GOLDFREQ-'
+GOLD_FREQ_CUR             = '-GOLDFREQCUR-'
+
 MAX_PATIENCE      = '-MAXPATIENCE-'
 MAX_PATIENCE_CUR  = '-MAXPATIENCECUR-'
 
@@ -134,16 +137,44 @@ class App:
 
         # =========================== SETTINGS TAB ===========================
         text_width = 20
-        settings_tab=[
-            [sg.Text('Saves Dir', size=(text_width,1), tooltip='Directory to load and save data'), sg.InputText(key=SAVE_FOLDER, size=(15,1)), sg.Text(key=SAVE_FOLDER_CUR, text=self.settings.save_dir, text_color='light gray', auto_size_text=True)], 
-            [sg.Text('Target zone (px)', size=(text_width,1), tooltip='Height and width (px) of the area used to check if target has triggered.'), sg.InputText(key=TARGET_ZONE, size=(15,1)), sg.Text(key=TARGET_ZONE_CUR, text=self.settings.target_zone, text_color='light gray', auto_size_text=True)], 
-            [sg.Text('UI refresh (ms)', size=(text_width,1), tooltip='Delay (ms) between UI refresh while running.\nLow values can affect performances'), sg.InputText(key=UI_UPDATE, size=(15,1)), sg.Text(key=UI_UPDATE_CUR, text=self.settings.ui_update, text_color='light gray', auto_size_text=True)], 
-            [sg.Text('Trigger check rate (s)', size=(text_width,1), tooltip='Delay (s) between trigger checks (Same as current patience level by default)\nLow values can affect performances'), sg.InputText(key=TRIGGER_CHECK_RATE, size=(15,1)), sg.Text(key=TRIGGER_CHECK_RATE_CUR, text=f'{"Same as patience" if self.settings.trigger_check_rate is None else self.settings.trigger_check_rate}', text_color='light gray', auto_size_text=True)], 
+        setting_frame_title_color = 'dark slate gray'
+        patience_settings = [
             [sg.Text('Max patience', size=(text_width,1), tooltip='When using trackers, patience will prevent the clicker to simply click as soon as its triggered.\nEach newly triggered target add 1 stack. Each stack will take <<patience level>> sec to deplete.'), sg.InputText(key=MAX_PATIENCE, size=(15,1)), sg.Text(key=MAX_PATIENCE_CUR, text=self.settings.max_patience, text_color='light gray', auto_size_text=True)], 
-            [sg.Text('Max patience Stack', size=(text_width,1), tooltip='Patience stack that would bring the queued up delay to exceed this value will be ignored.'), sg.InputText(key=MAX_PATIENCE_STACK, size=(15,1)), sg.Text(key=MAX_PATIENCE_STACK_CUR, text=self.settings.max_patience_stack, text_color='light gray', auto_size_text=True)], 
+            [sg.Text('Max patience Stack', size=(text_width,1), tooltip='Patience stack that would bring the queued up delay to exceed this value will be ignored.'), sg.InputText(key=MAX_PATIENCE_STACK, size=(15,1)), sg.Text(key=MAX_PATIENCE_STACK_CUR, text=self.settings.max_patience_stack, text_color='light gray', auto_size_text=True)],
+        ]
+        patience_settings_frame = [sg.Frame('Patience', patience_settings, visible=True, expand_x=True, title_color=setting_frame_title_color)]
+
+        cps_settings = [
             [sg.Text('Target CPS', size=(text_width,1), tooltip='Setpoint for CPS pid of fast trgets.'), sg.InputText(key=TARGET_CPS, size=(15,1)), sg.Text(key=TARGET_CPS_CUR, text=self.settings.target_cps, text_color='light gray', auto_size_text=True)], 
             [sg.Text('CPS Update Delay (s)', size=(text_width,1), tooltip='Delay between cps update (fast targets).'), sg.InputText(key=CPS_UPDATE, size=(15,1)), sg.Text(key=CPS_UPDATE_CUR, text=self.settings.cps_update_delay, text_color='light gray', auto_size_text=True)], 
+        ]
+        cps_settings_frame = [sg.Frame('FastClick', cps_settings, visible=True, expand_x=True, title_color=setting_frame_title_color)]
+
+        tracker_settings = [
+            [sg.Text('Trigger check rate (s)', size=(text_width,1), tooltip='Delay (s) between trigger checks (Same as current patience level by default)\nLow values can affect performances'), sg.InputText(key=TRIGGER_CHECK_RATE, size=(15,1)), sg.Text(key=TRIGGER_CHECK_RATE_CUR, text=f'{"Same as patience" if self.settings.trigger_check_rate is None else self.settings.trigger_check_rate}', text_color='light gray', auto_size_text=True)], 
+            [sg.Text('Target zone (px)', size=(text_width,1), tooltip='Height and width (px) of the area used to check if target has triggered.'), sg.InputText(key=TARGET_ZONE, size=(15,1)), sg.Text(key=TARGET_ZONE_CUR, text=self.settings.target_zone, text_color='light gray', auto_size_text=True)], 
+        ]
+        tracker_settings_frame = [sg.Frame('Tracker', tracker_settings, visible=True, expand_x=True, title_color=setting_frame_title_color)]
+
+        general_settings = [
+            [sg.Text('Saves Dir', size=(text_width,1), tooltip='Directory to load and save data'), sg.InputText(key=SAVE_FOLDER, size=(15,1)), sg.Text(key=SAVE_FOLDER_CUR, text=self.settings.save_dir, text_color='light gray', auto_size_text=True)], 
+            [sg.Text('UI refresh (ms)', size=(text_width,1), tooltip='Delay (ms) between UI refresh while running.\nLow values can affect performances'), sg.InputText(key=UI_UPDATE, size=(15,1)), sg.Text(key=UI_UPDATE_CUR, text=self.settings.ui_update, text_color='light gray', auto_size_text=True)], 
+        ]
+        general_settings_frame = [sg.Frame('General', general_settings, visible=True, expand_x=True, title_color=setting_frame_title_color)]
+
+        cookie_settings = [
             [sg.Checkbox(default=self.settings.check_for_gold_cookie, text='GOLD DIGGER', key=GOLD_DIGGER, size=(text_width,1), tooltip='If selected, will periodically check and queue up golden cookies\n(For Cookie Clicker game)'),sg.Text(key=GOLD_DIGGER_CUR, text=f'{"CLICKING GOLD!!!" if self.settings.check_for_gold_cookie else "Nope.. T_T"}', text_color='light gray', auto_size_text=True)], 
+            [sg.Text('Check freq (s)', size=(text_width,1), tooltip='Delay (s) between gold cookie seek'), sg.InputText(key=GOLD_FREQ, size=(15,1)), sg.Text(key=GOLD_FREQ_CUR, text=self.settings.check_for_gold_freq, text_color='light gray', auto_size_text=True)], 
+        ]
+        cookie_settings_frame = [sg.Frame('Cookie Clicker', cookie_settings, visible=True, expand_x=True, title_color=setting_frame_title_color)]
+
+
+        settings_tab=[
+            general_settings_frame,
+            tracker_settings_frame,
+            patience_settings_frame,
+            cps_settings_frame,
+            cookie_settings_frame,
             [sg.Button(button_text='Update', key=SUBMIT_SETTINGS)]
             ]
 
@@ -766,6 +797,14 @@ class App:
                 self.window[GOLD_DIGGER_CUR].update(value=f'{"CLICKING GOLD!!!" if self.settings.check_for_gold_cookie else "Nope.. T_T"}')
             else:
                 print(f'WARN - invalid GOLD_DIGGER value ({value})')
+
+        value = values[GOLD_FREQ]
+        if value != '':
+            if value.isdigit() and int(value) >= 1:
+                self.settings.check_for_gold_freq = int(value)
+                self.window[GOLD_FREQ_CUR].update(value=self.settings.check_for_gold_freq)
+            else:
+                print(f'WARN - invalid gold seek freq value ({value})')
 
         value = values[MAX_PATIENCE]
         if value != '':

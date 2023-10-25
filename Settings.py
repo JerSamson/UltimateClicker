@@ -12,6 +12,7 @@ class Settings(metaclass=Singleton):
         self.ui_update = 100
         self.trigger_check_rate = None
         self.check_for_gold_cookie = True
+        self.check_for_gold_freq = 5
         self.max_patience = 20
         self.max_patience_stack = 10
         self.target_cps = 50
