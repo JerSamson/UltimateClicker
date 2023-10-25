@@ -100,6 +100,7 @@ class App:
         self.settings = Settings()
         self.eventgraph = EventGraph(EVENT_GRAPH)  
 
+        self.last_saved = None
         self.click_listener_thread = None
         self.setting_targets = False
         self.targets = []
@@ -107,6 +108,7 @@ class App:
         self.mode = detectionMode.fast
 
         self.cwd = os.path.dirname(os.path.realpath(__file__)) + '\\'
+        self.last_save_file = 'last_save'
 
         self.track_target_lock = Lock()
         self.selected_target = None
@@ -298,10 +300,16 @@ class App:
                 break
 
     def load_last_auto_save(self):
-        self.load_targets('auto_save')
-
+        if self.get_last_saved() is None:
+            self.load_targets('auto_save')
+        else:
+            self.load_targets(self.last_saved)
+            
     def autosave(self):
-        self.save_targets('auto_save')
+        if self.settings.current_save is None:
+            self.save_targets('auto_save')
+        else:
+            self.save_targets(self.settings.current_save)
         self.last_autosave = time.time()
 
     def Choose_file_popup(self, text, data, can_create=False):
@@ -376,18 +384,39 @@ class App:
                         if row[1].isdigit():
                             save_has_gold = True
                             self.queue.golden_clicked = int(row[1])
+                    elif typ == 'TIME':
+                            self.settings.run_time = int(row[1])
 
                     if tar is not None:
-                        try: tar.times_clicked = int(row[4]) 
+                        try: 
+                            tar.times_clicked = int(row[4]) 
+                            self.add_target(tar, False) 
                         except: pass
-                        self.add_target(tar, False)
 
                 if not save_has_gold:
                     self.queue.golden_clicked = 0
+                
+                self.settings.current_save = save_file
 
         except Exception as e:
             print(f'Could not load targets from "{save_file}" ({e})')
 
+    def update_last_save(self, last_save):
+        print(f'INFO - UI.update_last_save() - Updating last save to {last_save}')
+        with open(self.cwd+self.last_save_file, 'w', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow(['last_save', last_save])
+            self.last_saved = last_save
+
+    def get_last_saved(self):
+        if self.last_saved is None:
+            with open(self.cwd+self.last_save_file, 'r') as file:
+                csvreader = csv.reader(file)
+                for row in csvreader:
+                    if row[0] == 'last_save':
+                        self.last_saved = row[1]
+        return self.last_saved
+    
     def save_targets(self, save_file):
         if len(self.targets) == 0:
             return
@@ -398,8 +427,12 @@ class App:
                 writer = csv.writer(file)
                 for tar in self.targets:
                     writer.writerow(tar.to_csv())
+
                 writer.writerow(['GOLD', self.queue.golden_clicked])
-            print(f'INFO - save_targets - Targets saved to {save_file}')
+                writer.writerow(['TIME', int(self.settings.run_time)])
+                
+            self.update_last_save(save_file)
+            print(f'INFO - save_targets - Targets saved successfuly to {save_file}')
             
         except Exception as e:
             print(f'Could not save files to "{save_file}" ({e})')
@@ -673,7 +706,7 @@ class App:
 
         while not self.aborted:
             time.sleep(1)
-            
+
         self.queue.stop()
 
         self.running = False
@@ -778,6 +811,7 @@ class App:
             self.click_listener_thread.start()
 
             while True:
+                start = time.time()
                 timeout = 250 if not self.running else self.settings.ui_update
                 event, values = self.window.read(timeout=timeout, timeout_key='NA')
                 if event != 'NA':
@@ -796,9 +830,11 @@ class App:
                     self.queue.has_update = False
                     self.targets = self.queue.targets
 
-                if self.running and self.autosave_freq > 0 and time.time() - self.last_autosave >= self.autosave_freq*60:
-                    print(f'INFO - UI.run() - Automatic save (Set for every {self.autosave_freq} minutes)')
-                    self.autosave()
+                if self.running:
+                    if self.autosave_freq > 0 and time.time() - self.last_autosave >= self.autosave_freq*60:
+                        print(f'INFO - UI.run() - Automatic save (Set for every {self.autosave_freq} minutes)')
+                        self.autosave()
+                    self.settings.run_time += (time.time()-start)
                     
                 self.update_graphs()
                 self.update_patience_slider()
@@ -834,9 +870,10 @@ class App:
                     if file is not None:
                         self.load_targets(file)
                 elif event == LOAD_LAST_BTN:
-                    self.load_targets('auto_save')
+                    self.load_targets(self.get_last_saved())
                 elif event == CLEAR_BTN:
                     self.queue.clear_targets()
+                    self.settings.current_save = None
                     self.selected_target = None
                 elif event == CLICK_BTN:
                     if not self.are_targets_ready():

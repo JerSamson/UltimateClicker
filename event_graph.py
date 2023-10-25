@@ -207,6 +207,18 @@ class EventGraph(metaclass=Singleton):
         for i in range(ts_range):
             self.add_event_entry(EventEntry(min+i, 'SecondMarker'))
 
+    def seconds_to_days_etc(self, seconds):
+        minutes, seconds = divmod(seconds, 60)
+        hours, minutes = divmod(minutes, 60)
+        days, hours = divmod(hours, 24)
+        return f'{int(days)}d{int(hours)}h{int(minutes)}m{int(seconds)}s'
+
+    def draw_runtime(self):
+        offset_x=550
+        offset_y=10
+        text = self.seconds_to_days_etc(self.settings.run_time)
+        self.graph.DrawText(text, location=(0,0), text_location=sg.TEXT_LOCATION_BOTTOM_LEFT, font=('Terminal'))
+
     @jit(target_backend='cuda', forceobj=True)
     def update(self):
         if self.has_new_entries():
@@ -221,3 +233,4 @@ class EventGraph(metaclass=Singleton):
             if self.has_cps_entries():
                 self.draw_cps()
 
+            self.draw_runtime()

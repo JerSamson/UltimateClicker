@@ -6,6 +6,7 @@ class settingsEntry:
 
 class Settings(metaclass=Singleton):
     def __init__(self) -> None:
+        self.current_save = None
         self.save_dir = 'SavedTargets\\'
         self.target_zone = 5
         self.ui_update = 100
@@ -15,3 +16,5 @@ class Settings(metaclass=Singleton):
         self.max_patience_stack = 10
         self.target_cps = 50
         self.cps_update_delay = 0.1
+
+        self.run_time = 0
