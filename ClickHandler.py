@@ -2,7 +2,7 @@ from Target import *
 from threading import Lock, Thread
 import time
 from ClickQueue import *
-from screenshot import SEEK_GOLDEN_COOKIES
+from GoldCookie import SEEK_GOLDEN_COOKIES
 from screenrecorder import ScreenRecorder
 from Settings import Settings
 from event_graph import EventGraph, EventEntry

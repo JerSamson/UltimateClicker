@@ -112,6 +112,7 @@ class App:
     def __init__(self) -> None:
         self.settings = Settings()
         self.eventgraph = EventGraph(EVENT_GRAPH)  
+        self.cam = ScreenRecorder()
 
         self.last_saved = None
         self.click_listener_thread = None
@@ -329,6 +330,16 @@ class App:
                 self.graph_cur.erase()
                 break
 
+    def get_middle_of_main_window(self):
+        location = self.window.CurrentLocation()
+        size = self.window.size
+        pLocation = (int(location[0] + size[0]/2), int(location[1] + size[1]/2))
+        return pLocation
+    
+    def information_popup(self, txt, duration=1, background='white'):
+
+        sg.PopupAutoClose(txt, auto_close_duration=duration, location=self.get_middle_of_main_window(), keep_on_top=True, non_blocking=True, background_color=background)
+
     def load_last_auto_save(self):
         if self.get_last_saved() is None:
             self.load_targets('auto_save')
@@ -357,7 +368,7 @@ class App:
                 [sg.OK(), sg.Cancel()],
             ]
         
-        window = sg.Window('POPUP', layout).Finalize()
+        window = sg.Window('POPUP', layout, location=self.get_middle_of_main_window()).Finalize()
         
         while True:
             event, values = window.read()
@@ -367,7 +378,7 @@ class App:
             elif event == 'OK':
                 break
             elif event == 'Cancel':
-                return None
+                break
             else:
                 print('OVER')
 
@@ -397,6 +408,7 @@ class App:
             save_has_gold = False
             self.queue.clear_targets()
             file_path = self.cwd + self.settings.save_dir + save_file
+            screenshot = self.cam.get_screen(caller='UI.LoadTargets()')
             with open(file_path, 'r') as file:
                 csvreader = csv.reader(file)
 
@@ -405,11 +417,11 @@ class App:
                     tar = None
                     typ = row[0]
                     if typ == 'Tracker':
-                        tar = TrackerTarget(int(row[1]), int(row[2]), self.settings.target_zone, detectionMode(int(row[3])))
+                        tar = TrackerTarget(int(row[1]), int(row[2]), self.settings.target_zone, detectionMode(int(row[3])), initial_screenshot=screenshot)
                     elif typ == 'Fast':
-                        tar = FastTarget(int(row[1]), int(row[2]))
+                        tar = FastTarget(int(row[1]), int(row[2]), initial_screenshot=screenshot)
                     elif typ == 'Idle':
-                        tar = IdleTarget(int(row[1]), int(row[2]))
+                        tar = IdleTarget(int(row[1]), int(row[2]), initial_screenshot=screenshot)
                     elif typ == 'GOLD':
                         if row[1].isdigit():
                             save_has_gold = True
@@ -463,9 +475,10 @@ class App:
                 
             self.update_last_save(save_file)
             print(f'INFO - save_targets - Targets saved successfuly to {save_file}')
-            
+            self.information_popup('Save success', background='green')
         except Exception as e:
             print(f'Could not save files to "{save_file}" ({e})')
+            self.information_popup("Save Failed", background='red')
 
     def draw(self, tar=None, graph = None):
         graph.draw_image(data=tar.ref_area, location=(-IMAGE_SIZE_X, IMAGE_SIZE_Y))

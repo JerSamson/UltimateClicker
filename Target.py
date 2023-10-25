@@ -35,7 +35,7 @@ IMAGE_SIZE_X = 150
 IMAGE_SIZE_Y = 30
 
 class BaseTarget(object):
-    def __init__(self, x, y, info_freq=0, active=False, og_screenshot=None):
+    def __init__(self, x, y, info_freq=0, active=False, initial_screenshot=None):
         self.settings = Settings()
         self.x = x
         self.y = y
@@ -49,6 +49,7 @@ class BaseTarget(object):
         self.times_clicked=0
         self.ref_area = None
         self.mouse = Controller()
+        self.initial_screenshot = initial_screenshot
         self.type_priority = {
             TrackerTarget :  100,
             IdleTarget    :  1000,
@@ -56,12 +57,42 @@ class BaseTarget(object):
         }
         self.priority_mode = 'lowest_first'
         self.priority = 0
+        self.cam = ScreenRecorder()
 
     def __lt__(self, target):
         return self.priority < target.priority
 
     def __eq__(self, __value: object) -> bool:
         return self.x == __value.x and self.y == __value.y and type(self) == type(__value)
+
+    def get_ref_area(self, screenshot=None):
+        try:
+            res = pyautogui.size() #TODO change that
+            x1 = self.x - IMAGE_SIZE_X if self.x > IMAGE_SIZE_X else 0
+            x2 = self.x + IMAGE_SIZE_X if self.x + IMAGE_SIZE_X < res[0] else res[0]
+            y1 = self.y - IMAGE_SIZE_Y if self.y > IMAGE_SIZE_Y else 0
+            y2 = self.y + IMAGE_SIZE_Y if self.y + IMAGE_SIZE_Y < res[1] else res[1]
+
+            if screenshot is None:
+                # im=ImageGrab.grab(bbox=(x1, y1, x2, y2))
+                screenshot=self.cam.get_screen(caller=f'Target[{self.targetid}]')
+                im = Image.fromarray(screenshot, 'RGB').crop((x1, y1, x2, y2))
+
+                # print('')
+                # self.ref_area = base64.b64encode(im)
+            else:
+                # im=screenshot[x1:x2, y1:y2]
+                im = Image.fromarray(screenshot, 'RGB').crop((x1, y1, x2, y2))
+                
+            buffer = io.BytesIO()
+            im.save(buffer, format='PNG')
+            im.close()
+            self.ref_area = base64.b64encode(buffer.getvalue())
+
+        except Exception as e:
+            print(f'ERROR - TARGET{self.targetid} - get_ref_area ({e})')
+            self.ref_area = None
+            pass # Minor repercussions
 
     def get_priority(self, tar):
         raise NotImplementedError()
@@ -108,9 +139,9 @@ class BaseTarget(object):
         raise NotImplementedError()
 
 class IdleTarget(BaseTarget):
-    def __init__(self, x, y, delay):
-        BaseTarget.__init__(self, x, y)
-        self.get_ref_area()
+    def __init__(self, x, y, delay, initial_screenshot=None):
+        BaseTarget.__init__(self, x, y, initial_screenshot=initial_screenshot)
+        self.get_ref_area(initial_screenshot)
         self.delay = delay
 
     def is_ready(self):
@@ -133,24 +164,6 @@ class IdleTarget(BaseTarget):
     def to_csv(self):
         return ['IDLE', self.x, self.y, '', self.times_clicked]
 
-    def get_ref_area(self):
-        try:
-            res = pyautogui.size() #TODO change that
-            x1 = self.x - IMAGE_SIZE_X if self.x > IMAGE_SIZE_X else 0
-            x2 = self.x + IMAGE_SIZE_X if self.x + IMAGE_SIZE_X < res[0] else res[0]
-            y1 = self.y - IMAGE_SIZE_Y if self.y > IMAGE_SIZE_Y else 0
-            y2 = self.y + IMAGE_SIZE_Y if self.y + IMAGE_SIZE_Y < res[1] else res[1]
-
-            im=ImageGrab.grab(bbox=(x1, y1, x2, y2))
-            buffer = io.BytesIO()
-            im.save(buffer, format='PNG')
-            im.close()
-            self.ref_area = base64.b64encode(buffer.getvalue())
-        except Exception as e:
-            print(f'ERROR - IDLE - get_ref_area ({e})')
-            self.ref_area = None
-            pass # Minor repercussions
-
     def check_trigger(self):
         pass
 
@@ -164,8 +177,8 @@ class IdleTarget(BaseTarget):
             return False
 
 class FastTarget(BaseTarget):
-    def __init__(self, x, y, info_freq=0, active=False):
-        BaseTarget.__init__(self, x, y, info_freq, active)
+    def __init__(self, x, y, info_freq=0, active=False, initial_screenshot=None):
+        BaseTarget.__init__(self, x, y, info_freq, active, initial_screenshot)
         self.delay = 0.0001
         self.init_delay = self.delay
         self.most_efficient_delay = self.delay
@@ -182,7 +195,7 @@ class FastTarget(BaseTarget):
         self.start_time       = time.time()
         self.eventgraph = EventGraph()
 
-        self.get_ref_area()
+        self.get_ref_area(initial_screenshot)
 
     def approxCpsAverage(self, new_sample):
         self.n_cps_sample += 1
@@ -215,28 +228,6 @@ class FastTarget(BaseTarget):
         # self.nb_clicks = self.nb_clicks + 1
         return super().click()
 
-    def get_ref_area(self):
-        try:
-            res = pyautogui.size() #TODO change that
-            x1 = self.x - IMAGE_SIZE_X if self.x > IMAGE_SIZE_X else 0
-            x2 = self.x + IMAGE_SIZE_X if self.x + IMAGE_SIZE_X < res[0] else res[0]
-            y1 = self.y - IMAGE_SIZE_Y if self.y > IMAGE_SIZE_Y else 0
-            y2 = self.y + IMAGE_SIZE_Y if self.y + IMAGE_SIZE_Y < res[1] else res[1]
-
-            # im=ScreenRecorder().get_screen((x1, y1, x2, y2))
-            # self.ref_area = base64.b64encode(im)
-
-            im=ImageGrab.grab(bbox=(x1, y1, x2, y2))
-            buffer = io.BytesIO()
-            im.save(buffer, format='PNG')
-            im.close()
-            self.ref_area = base64.b64encode(buffer.getvalue())
-
-        except Exception as e:
-            print(f'ERROR - FAST - get_ref_area ({e})')
-            self.ref_area = None
-            pass # Minor repercussions
-
     def stop(self):
         self.cps = 0
         self.avg_cps = 0
@@ -259,7 +250,6 @@ class FastTarget(BaseTarget):
             print(f'\rTotal time:\t{int(now-self.start_time)}s')
             print(f'\rTotal clicks:\t{self.times_clicked} clicks')
             print(f'\rCPS:\t\t{int(self.cps)}cps')
-            # print(f'\rCPS_t:\t\t{int(self.cps_theo)}cps')
             print(f'avg cps:\t{int(self.times_clicked/(now-self.start_time))}cps')
             print(f'\nhighest cps:{int(self.highest_cps)}s')
 
@@ -312,8 +302,8 @@ class FastTarget(BaseTarget):
 
 
 class TrackerTarget(BaseTarget):
-    def __init__(self, x, y, zone_area, mode, mindist = 300, info_freq=False, active=False):
-        BaseTarget.__init__(self, x, y, info_freq, active)
+    def __init__(self, x, y, zone_area, mode, mindist = 300, info_freq=False, active=False, initial_screenshot=None):
+        BaseTarget.__init__(self, x, y, info_freq, active, initial_screenshot)
         self.zone_area = zone_area
         self.mode = mode
         self.triggered = False
@@ -326,7 +316,7 @@ class TrackerTarget(BaseTarget):
         self.delay_after_handle_2_trigger = 1
         self.tolerance = 5
         self.priority = self.get_priority()
-        self.bg_color_acquisition()
+        self.bg_color_acquisition(initial_screenshot)
   
     def to_csv(self):
         return ['Tracker', self.x, self.y, int(self.mode), self.times_clicked]
@@ -345,57 +335,36 @@ class TrackerTarget(BaseTarget):
     def is_ready(self):
         return self.acquired
 
-    def get_ref_area(self, screenshot=None):
-        try:
-            res = pyautogui.size() #TODO change that
-            x1 = self.x - IMAGE_SIZE_X if self.x > IMAGE_SIZE_X else 0
-            x2 = self.x + IMAGE_SIZE_X if self.x + IMAGE_SIZE_X < res[0] else res[0]
-            y1 = self.y - IMAGE_SIZE_Y if self.y > IMAGE_SIZE_Y else 0
-            y2 = self.y + IMAGE_SIZE_Y if self.y + IMAGE_SIZE_Y < res[1] else res[1]
-            if screenshot is None:
-                im=ImageGrab.grab(bbox=(x1, y1, x2, y2))
-                # self.ref_area = base64.b64encode(im)
-            else:
-                # im=screenshot[x1:x2, y1:y2]
-                im = Image.fromarray(screenshot, 'RGB').crop((x1, y1, x2, y2))
-                
-            buffer = io.BytesIO()
-            im.save(buffer, format='PNG')
-            im.close()
-            self.ref_area = base64.b64encode(buffer.getvalue())
-
-        except Exception as e:
-            print(f'ERROR - TRACKER - get_ref_area ({e})')
-            self.ref_area = None
-            pass # Minor repercussions
-
-    @jit(target_backend='cuda', forceobj=True)
+    # @jit(target_backend='cuda', forceobj=True)
     def get_color(self, screenshot=None):
         if screenshot is None:
             screenshot = np.array(ImageGrab.grab())
         img=Image.fromarray(screenshot, 'RGB').crop((int(self.x-self.zone_area/2), int(self.y-self.zone_area/2), int(self.x+self.zone_area/2), int(self.y+self.zone_area/2))).getcolors()
         return img
 
-    @jit(target_backend='cuda', forceobj=True)
-    def color_acquisition(self):
+    # @jit(target_backend='cuda', forceobj=True)
+    def color_acquisition(self, screenshot=None):
+        had_to_wait = False
         x,y = win32api.GetCursorPos()
         while (abs(self.x-x) <= self.acquisition_min_dist and abs(self.y-y) <= self.acquisition_min_dist):
+            had_to_wait = True
             time.sleep(0.2)
             x,y = win32api.GetCursorPos()
 
-        # screenshot = ScreenRecorder().get_screen()
+        if had_to_wait or screenshot is None:
+            screenshot = ScreenRecorder().get_screen()
         
         # Get ref area
-        self.get_ref_area()
+        self.get_ref_area(screenshot=screenshot)
 
         self.color = self.get_color()
         self.acquired = True
         self.waiting_acquisition = False
 
-    def bg_color_acquisition(self):
+    def bg_color_acquisition(self, screenshot=None):
         self.waiting_acquisition = True
         self.acquired = False
-        Thread(target=self.color_acquisition, daemon=True, name='bg_color_acquisition').start()
+        Thread(target=self.color_acquisition, daemon=True, name='bg_color_acquisition', args=[screenshot]).start()
 
     def check_trigger(self, screenshot=None):
 
