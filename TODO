@@ -3,11 +3,11 @@ DONE - Real-Time cps graph
 DONE - Instead of checking individual tracker target zones for triggers, to save computing power: 
             - Take a screenshot of the whole screen / game
             - Check every target using the same picture (Optional arg)
+Done - Runtime counter
+Done - Auto save to specified file instead of default 'auto_save'
 
 
-Runtime counter
 Delete save
-Auto save to specified file instead of default 'auto_save'
 
 - Possibility of specifying a specific window for a target? 
     (Like the regex used in screenshot.get_cookie_clicker_screenshot)
@@ -21,6 +21,7 @@ Idle targets implementation
 * Improve impatient mode performances
     events instead of update_trigger?
 
+Different priority types
 
 Setting class (xml?)
     - Default settings
