@@ -673,6 +673,7 @@ class App:
 
         while not self.aborted:
             time.sleep(1)
+            
         self.queue.stop()
 
         self.running = False

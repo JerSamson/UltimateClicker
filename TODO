@@ -4,6 +4,8 @@ DONE - Instead of checking individual tracker target zones for triggers, to save
             - Take a screenshot of the whole screen / game
             - Check every target using the same picture (Optional arg)
 
+
+Runtime counter
 Delete save
 Auto save to specified file instead of default 'auto_save'
 

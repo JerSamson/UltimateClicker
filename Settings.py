@@ -13,5 +13,5 @@ class Settings(metaclass=Singleton):
         self.check_for_gold_cookie = True
         self.max_patience = 20
         self.max_patience_stack = 10
-        self.target_cps = 100
+        self.target_cps = 50
         self.cps_update_delay = 0.1

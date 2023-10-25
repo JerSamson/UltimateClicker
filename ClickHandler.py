@@ -53,6 +53,7 @@ class ClickHandler:
         self.golden_clicked = 0
         self.settings = Settings()
         self.eventgraph = EventGraph()
+        self.cam = ScreenRecorder()
 
     def get_allowed_positions(self):
         #MaybeLock
@@ -101,6 +102,8 @@ class ClickHandler:
         return self.fast_target is not None and self.fast_target.enabled
  
     def has_tracker_targets(self):
+        if len(self.targets) <= 0:
+            return False
         return len([t for t in self.targets if isinstance(t, TrackerTarget) and t.enabled]) > 0
 
     # def empty_queue(self):
@@ -189,6 +192,11 @@ class ClickHandler:
         self.targets.remove(tar)
         self.has_update = True
 
+    def clean_queue(self):
+        self.click_queue.clean_queue()
+        if self.click_queue.is_empty():
+            self.clear_patience()
+
     def wait_additionnal_time(self):
         add_wait = self.get_additionnal_wait()
 
@@ -210,16 +218,18 @@ class ClickHandler:
             self.wait_prog = self.patience_level
             self.increment_patience(-1)
             self.has_update = True
-            self.click_queue.clean_queue()
+            self.clean_queue()
             self.change_if_higher_priority()
-
+            if self.click_queue.is_empty():
+                self.clear_patience()
             if self.click_queue.is_in_queue(self.next_target):
                 self.next_target = None 
 
             if self.next_target is not None and self.next_target[1].priority == self.top_priority:
                 # self.clear_patience()
-                self.handle_task(self.next_target)
-                self.click_queue.clean_queue()
+                self.handle_task(self.next_target[1])
+                self.increment_patience(-1)
+                self.clean_queue()
                 if self.click_queue.is_in_queue(self.next_target):
                     self.next_target = None 
                 break
@@ -246,7 +256,7 @@ class ClickHandler:
                 self.increment_patience(1)
                 Thread(target=self.handle_one, name='HandleOne', daemon=True).start()
 
-        self.targets = self.click_queue.clean_queue(self.targets)
+        self.clean_queue()
         if self.click_queue.is_in_queue(self.next_target):
             self.next_target = None 
 
@@ -261,10 +271,10 @@ class ClickHandler:
             try:
                 self.add_event_entry('update_thread')
                 print('INFO - ClickHandler.update_thread() looped =========================================')
-                screenshot = ScreenRecorder().get_screen()
+                screenshot = self.cam.get_screen()
                 # print(f'DEBUG - Update_thread() - Getting screenshot took {round(time.time()-start,2)}s =-=--=-=-=-=-=-=')
                 
-                # checking_trig_start = time.time()
+                checking_trig_start = time.time()
                 for tar in self.targets:
                     if not isinstance(tar, FastTarget) and tar.enabled and tar.check_trigger(screenshot):
                         if self.next_target is None or tar is not self.next_target[1]:
@@ -307,7 +317,7 @@ class ClickHandler:
                 self.add_event_entry('HandleOne')
             result = task.handle()
         except Exception as e:
-            print(f'Task was too much to handle ({e})')
+            print(f'ERROR - HandleTask[{task[1].targetid}]Task was too much to handle ({e})')
         finally:
             self.handle_lock.release()
             return result
@@ -334,46 +344,50 @@ class ClickHandler:
             self.next_target = pot
             self.has_update = True
 
-    @jit(target_backend='cuda', forceobj=True)
+    # @jit(target_backend='cuda', forceobj=True)
     def SeekAndClickGOOOOLD(self):
         print('INFO - ClickHandler.SeekAndClickGOOOOLD() - GOLD DIGGER thread started ')
         normal_wait = 5
         streak_cnt = 0
 
         while self.running:
-            self.add_event_entry('GoldenCookie')
-            print('INFO - ClickHandler.SeekAndClickGOOOOLD() - SEEKING')
-            MaybeACookie = SEEK_GOLDEN_COOKIES()
+            try:
+                start = time.time()
+                self.add_event_entry('GoldenCookie')
+                print('INFO - ClickHandler.SeekAndClickGOOOOLD() - SEEKING')
+                MaybeACookie = SEEK_GOLDEN_COOKIES()
 
-            if MaybeACookie is not None and self.running:
-                if self.last_golden_cookie_pos is None or self.last_golden_cookie_pos != (MaybeACookie.x, MaybeACookie.y):
-                    print('INFO - ClickHandler.SeekAndClickGOOOOLD() - COOKIE FOUND')
+                if MaybeACookie is not None and self.running:
+                    if self.last_golden_cookie_pos is None or self.last_golden_cookie_pos != (MaybeACookie.x, MaybeACookie.y):
+                        print('INFO - ClickHandler.SeekAndClickGOOOOLD() - COOKIE FOUND')
 
-                    self.last_golden_cookie_pos = (MaybeACookie.x, MaybeACookie.y)
-                    self.add_target(MaybeACookie)
-                    self.handle_task(MaybeACookie)
-                    self.remove_target(MaybeACookie)
-                    self.golden_clicked += 1
-                    self.has_update = True
-                    if streak_cnt + 1 < normal_wait:
-                        streak_cnt += 1
-                        print(f'INFO - ClickHandler.SeekAndClickGOOOOLD() - STREAK - Updated delay between check to {normal_wait-streak_cnt}s')
+                        self.last_golden_cookie_pos = (MaybeACookie.x, MaybeACookie.y)
+                        self.add_target(MaybeACookie)
+                        self.handle_task(MaybeACookie)
+                        self.remove_target(MaybeACookie)
+                        self.golden_clicked += 1
+                        self.has_update = True
+                        if streak_cnt + 1 < normal_wait:
+                            if streak_cnt + 2 < normal_wait:
+                                streak_cnt += 2
+                            else:
+                                streak_cnt += 1
+                            print(f'INFO - ClickHandler.SeekAndClickGOOOOLD() - STREAK - Updated delay between check to {normal_wait-streak_cnt}s')
+                    else:
+                        if streak_cnt >= 0.5:
+                            streak_cnt -= 0.5
+                            print(f'INFO - ClickHandler.SeekAndClickGOOOOLD() - NON STREAK - Updated delay between check to {normal_wait-streak_cnt}s')
+                        print('INFO - Dismissing golden cookie because it seems to be the same as the last one detected')
                 else:
-                    if streak_cnt >= 1:
-                        if streak_cnt >= 2:
-                            streak_cnt -= 2
-                        else:
-                            streak_cnt -= 1
+                    if streak_cnt >= 0.5:
+                        streak_cnt -= 0.5
                         print(f'INFO - ClickHandler.SeekAndClickGOOOOLD() - NON STREAK - Updated delay between check to {normal_wait-streak_cnt}s')
-
-                    print('INFO - Dismissing golden cookie because it seems to be the same as the last one detected')
-            else:
-                if streak_cnt >= 1:
-                    streak_cnt -= 1
-                    print(f'INFO - ClickHandler.SeekAndClickGOOOOLD() - NON STREAK - Updated delay between check to {normal_wait-streak_cnt}s')
-
-            self.wait(normal_wait-streak_cnt)
-                
+                stop = time.time()
+                actual_wait = (normal_wait-streak_cnt) - (start-stop)
+                if actual_wait > 0:
+                    self.wait(normal_wait-streak_cnt)
+            except:
+                pass
 
         print('INFO - ClickHandler.SeekAndClickGOOOOLD() - GOLD DIGGER thread finished ')
         
@@ -401,9 +415,9 @@ class ClickHandler:
                     self.has_update = True
                     self.handling_one = False
 
-                self.click_queue.clean_queue()
+                self.clean_queue()
                 if self.click_queue.is_in_queue(self.next_target):
-                    self.next_target = None 
+                    self.next_target = None
 
         except Exception as e:
             print(f'ERROR - ClickHandler.handle_one() thread failed ({e})')

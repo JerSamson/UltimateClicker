@@ -142,8 +142,11 @@ class EventGraph(metaclass=Singleton):
             self.bottom_left = (bottom_left_x, bottom_left_y)
 
             top_right_x = max_cps_timestamp
-            top_right_y = max_cps_entry + 50
 
+            if self.settings.target_cps > 0 and max_cps_entry < max_cps_entry + self.settings.target_cps:
+                top_right_y = max_cps_entry + self.settings.target_cps
+            else:
+                top_right_y = max_cps_entry + 50
             self.top_right = (top_right_x, top_right_y)
 
             self.graph.BottomLeft = self.bottom_left
