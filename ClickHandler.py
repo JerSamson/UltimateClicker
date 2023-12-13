@@ -269,7 +269,8 @@ class ClickHandler:
                 self.logger.info('ClickHandler.update_thread() looped ========================')
 
                 screenshot = self.cam.get_screen(caller='ClickHandler.UpdateThread()')
-                self.logger.debug(f'Update_thread() - Getting screenshot took {round(time.time()-start,2)}s =-=--=-=-=-=-=-=')
+                screenshot_time = round(time.time()-start,2)
+                self.logger.debug(f'ClickHandler.update_thread() - Getting screenshot took {screenshot_time}s =-=--=-=-=-=-=-=')
 
                 checking_trig_start = time.time()
                 for tar in self.targets:
@@ -279,7 +280,8 @@ class ClickHandler:
                                 self.increment_patience(1, tar)
                                 self.has_update = True
 
-                self.logger.debug(f'Update_thread() - checking triggers took {round(time.time()-checking_trig_start,2)}s =-=--=-=-=-=-=-=')
+                check_triggers_time = round(time.time()-checking_trig_start,2)
+                self.logger.debug(f'ClickHandler.update_thread() - checking triggers took {check_triggers_time}s =-=--=-=-=-=-=-=')
 
                 if self.patience_level > 0:
                     Thread(target=self.try_handle_one, name='TryHandleOne', daemon=True).start()
@@ -288,14 +290,18 @@ class ClickHandler:
                 self.logger.error(f'ClickHandler.update_thread() - thread failed ({e})')
 
             tracker_Interval = self.settings.trigger_check_rate if self.settings.trigger_check_rate is not None else self.patience_level if self.patience_level > 0 else 1 #self.patience_level/2
-
             stop = time.time()
 
-            actual_wait_time = tracker_Interval - (stop-start)
-            self.logger.debug(f'Update_thread() - Update_thread() - Took {round(stop-start, 2)}s - Waiting time is {actual_wait_time}s =-=--=-=-=-=-=-=')
+            execution_time = (stop - start)
+            actual_wait_time = tracker_Interval - execution_time
+            self.logger.debug(f'ClickHandler.update_thread() - Took {round(stop-start, 2)}s - Waiting time is {actual_wait_time}s =-=--=-=-=-=-=-=')
 
             if actual_wait_time > 0:
                 self.wait(actual_wait_time)
+            else:
+                self.logger.warn(f'ClickHandler.update_thread() - Execution time was longer than Interval ({tracker_Interval} vs {execution_time})')
+                self.logger.warn(f'\tGetting screenshot took {round(screenshot_time*1000, 2)}ms')
+                self.logger.warn(f'\tChecking triggers took {round(check_triggers_time*1000, 2)}ms')
 
         self.logger.info('ClickHandler.update_thread() - thread finished')
 
@@ -360,12 +366,9 @@ class ClickHandler:
                         self.remove_target(MaybeACookie)
                         self.golden_clicked += 1
                         self.has_update = True
-                        if streak_cnt + 1 < normal_wait:
-                            if streak_cnt + 2 < normal_wait:
-                                streak_cnt += 2
-                            else:
-                                streak_cnt += 1
-                            self.logger.info(f'ClickHandler.SeekAndClickGOOOOLD() - STREAK - Updated delay between check to {normal_wait-streak_cnt}s')
+
+                        streak_cnt = normal_wait
+                        self.logger.info(f'ClickHandler.SeekAndClickGOOOOLD() - STREAK - Updated delay between check to {normal_wait-streak_cnt}s')
                     else:
                         if streak_cnt >= 0.5:
                             streak_cnt -= 0.5

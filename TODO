@@ -23,6 +23,10 @@ Idle targets implementation
 
 Different priority types
 
+UI optimisations
+    - Click buttons shouldnt be visible on settings page
+    - Settings could have collapsable sections
+
 Setting class (xml?)
     - Default settings
     - Ability to change default settings
