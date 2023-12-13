@@ -5,12 +5,12 @@ from pynput.mouse import Listener
 from ClickHandler import ClickHandler
 from Target import *
 from logger import Logger
-from Collapsible import Collapsible
+from Collapsible import *
 import cursor
 import csv
 import os 
 
-from Settings import Settings
+from Settings import Settings, SettingEntry
 from event_graph import *
 
 millnames = ['',' Thousand',' Million',' Billion',' Trillion']
@@ -65,86 +65,68 @@ COLOR_PREVIEW_SIZE       = (10,2)
      
 TRACK_TAB                = '-TRACK_TAB-'
      
-#SETTINGS    
+# SETTINGS    
 SETTINGS_TAB             = '-SETTINGS_TAB-'
      
-PATIENCE_FRAME           = '-PATIENCE_FRAME-'
-COLLAPSE_PATIENCE_FRAME  = '-COLLAPSE_PATIENCE_FRAME-'
-
-CPS_FRAME                = '-CPS_FRAME-'
-COLLAPSE_CPS_FRAME       = '-COLLAPSE_CPS_FRAME-'
-
-TRACKER_FRAME            = '-TRACKER_FRAME-'
-COLLAPSE_TRACKER_FRAME   = '-COLLAPSE_TRACKER_FRAME-'
-
+#   GENERAL
 GENERAL_FRAME            = '-GENERAL_FRAME-'
 COLLAPSE_GENERAL_FRAME   = '-COLLAPSE_GENERAL_FRAME-'
+SAVE_FOLDER              = '-SAVE_DIR-'
+SAVE_FOLDER_CUR          = '-SAVE_DIR_CUR-'
+UI_UPDATE                = '-UI_UPDATE-'
+UI_UPDATE_CUR            = '-UI_UPDATE_CUR-'
+AUTOSAVE_FREQ            = '-AUTOSAVE_FREQ-'
+AUTOSAVE_FREQ_CUR        = '-AUTOSAVE_FREQ_CUR-'
 
-COOKIE_FRAME             = '-COOKIE_FRAME-'
-COLLAPSE_COOKIE_FRAME    = '-COLLAPSE_COOKIE_FRAME-'
+#   PATIENCE
+PATIENCE_FRAME           = '-PATIENCE_FRAME-'
+COLLAPSE_PATIENCE_FRAME  = '-COLLAPSE_PATIENCE_FRAME-'
+MAX_PATIENCE             = '-MAX_PATIENCE-'
+MAX_PATIENCE_CUR         = '-MAX_PATIENCE_CUR-'
+MAX_PATIENCE_STACK       = '-MAX_PATIENCE_STACK-'
+MAX_PATIENCE_STACK_CUR   = '-MAX_PATIENCE_STACK_CUR-'
 
-PID_FRAME                = '-PID_FRAME-'
-COLLAPSE_PID_FRAME       = '-COLLAPSE__PID_FRAME-'
-     
-SUBMIT_SETTINGS          = '-SUBMITSETTINGS'
-SAVE_FOLDER              = '-SAVEDIR-'
-SAVE_FOLDER_CUR          = '-SAVEDIRCUR-'
-     
-TARGET_ZONE              = '-TARGETZONE-'
-TARGET_ZONE_CUR          = '-TARGETZONECUR-'
-     
-UI_UPDATE                = '-UIUPDATE-'
-UI_UPDATE_CUR            = '-UIUPDATECUR-'
+#   CPS
+CPS_FRAME                = '-CPS_FRAME-'
+COLLAPSE_CPS_FRAME       = '-COLLAPSE_CPS_FRAME-'
+TARGET_CPS               = '-TARGET_CPS-'
+TARGET_CPS_CUR           = '-TARGET_CPS_CUR-'
+CPS_UPDATE               = '-CPS_UPDATE-'
+CPS_UPDATE_CUR           = '-CPS_UPDATE_CUR-'
 
+#   TRACKER
+TRACKER_FRAME            = '-TRACKER_FRAME-'
+COLLAPSE_TRACKER_FRAME   = '-COLLAPSE_TRACKER_FRAME-'
+TARGET_ZONE              = '-TARGET_ZONE-'
+TARGET_ZONE_CUR          = '-TARGET_ZONE_CUR-'
 TRIGGER_CHECK_RATE       = '-TRIGGERCHECK-'
 TRIGGER_CHECK_RATE_CUR   = '-TRIGGERCHECKCUR-'
 
-GOLD_DIGGER              = '-GOLDDIG'
-GOLD_DIGGER_CUR          = '-GOLDDIGCUR'
+#   COOKIE
+COOKIE_FRAME             = '-COOKIE_FRAME-'
+COLLAPSE_COOKIE_FRAME    = '-COLLAPSE_COOKIE_FRAME-'
+GOLD_DIGGER              = '-GOLD_DIG'
+GOLD_DIGGER_CUR          = '-GOLD_DIG_CUR'
+GOLD_FREQ                = '-GOLD_FREQ-'
+GOLD_FREQ_CUR            = '-GOLD_FREQ_CUR-'
 
-GOLD_FREQ                = '-GOLDFREQ-'
-GOLD_FREQ_CUR            = '-GOLDFREQCUR-'
-
-MAX_PATIENCE             = '-MAXPATIENCE-'
-MAX_PATIENCE_CUR         = '-MAXPATIENCECUR-'
-
-MAX_PATIENCE_STACK       = '-MAXPATIENCESTACK-'
-MAX_PATIENCE_STACK_CUR   = '-MAXPATIENCESTACKCUR-'
-
-TARGET_CPS               = '-TARGETCPS-'
-TARGET_CPS_CUR           = '-TARGETCPSCUR-'
-
-CPS_UPDATE               = '-CPSUPDATE-'
-CPS_UPDATE_CUR           = '-CPSUPDATECUR-'
-
-AUTOSAVE_FREQ            = '-AUTOSAVE_FREQ-'
-AUTOSAVE_FREQ_CUR        = '-AUTOSAVE_FREQCUR-'
-
+#   PID
+PID_FRAME                = '-PID_FRAME-'
+COLLAPSE_PID_FRAME       = '-COLLAPSE__PID_FRAME-'
 KP                       = '-KP-'
+KP_CUR                   = '-KP_CUR-'
 KI                       = '-KI-'
+KI_CUR                   = '-KI_CUR-'
 KD                       = '-KD-'
-KP_CUR                   = '-KPCUR-'
-KI_CUR                   = '-KICUR-'
-KD_CUR                   = '-KDCUR-'
+KD_CUR                   = '-KD_CUR-'
+
+SUBMIT_SETTINGS          = '-SUBMIT_SETTINGS-'
 
 def rgb_to_hex(r, g, b):
     return '#{:02x}{:02x}{:02x}'.format(r, g, b)
 
 def text_color_for_bg(r,g,b):
     return '#000000' if (r*0.299 + g*0.587 + b*0.114) > 186 else '#ffffff'
-
-SYMBOL_UP =    '▲'
-SYMBOL_DOWN =  '▼'
-def collapse(layout, key, start_visible=False):
-    """
-    Helper function that creates a Column that can be later made hidden, thus appearing "collapsed"
-    :param layout: The layout for the section
-    :param key: Key used to make this seciton visible / invisible
-    :return: A pinned column that can be placed directly into your layout
-    :rtype: sg.pin
-    """
-    return sg.pin(sg.Column(layout, key=key, visible=start_visible))
-
     
 class App:
     def __init__(self) -> None:
@@ -188,48 +170,66 @@ class App:
         text_width = 20
         setting_frame_title_color = 'dark slate gray'
 
+        # General settings
+        save_dir_setting   = SettingEntry('Saves Dir', SAVE_FOLDER, SAVE_FOLDER_CUR, self.settings.save_dir, 'Directory to load and save data')
+        UI_refresh_setting = SettingEntry('UI refresh (ms)', UI_UPDATE, UI_UPDATE_CUR, self.settings.ui_update, 'Delay (ms) between UI refresh while running.\nLow values can affect performances')
+        autosave_setting   = SettingEntry('Autosave (s)', AUTOSAVE_FREQ, AUTOSAVE_FREQ_CUR, self.settings.autosave_freq, 'Delay (s) between Autosaves (0 for no autosave)')
+
         general_settings_layout = [
-            [sg.Text('Saves Dir', size=(text_width,1), tooltip='Directory to load and save data'), sg.InputText(key=SAVE_FOLDER, size=(15,1)), sg.Text(key=SAVE_FOLDER_CUR, text=self.settings.save_dir, text_color='light gray', auto_size_text=True)], 
-            [sg.Text('UI refresh (ms)', size=(text_width,1), tooltip='Delay (ms) between UI refresh while running.\nLow values can affect performances'), sg.InputText(key=UI_UPDATE, size=(15,1)), sg.Text(key=UI_UPDATE_CUR, text=self.settings.ui_update, text_color='light gray', auto_size_text=True)], 
-            [sg.Text('Autosave (s)', size=(text_width,1), tooltip='Delay (s) between Autosaves (0 for no autosave)'), sg.InputText(key=AUTOSAVE_FREQ, size=(15,1)), sg.Text(key=AUTOSAVE_FREQ_CUR, text=self.settings.autosave_freq, text_color='light gray', auto_size_text=True)], 
+            save_dir_setting.layout(),
+            UI_refresh_setting.layout(),
+            autosave_setting.layout()
         ]
         general_settings = Collapsible('General', general_settings_layout, GENERAL_FRAME, COLLAPSE_GENERAL_FRAME, True)
         self.collapsibles.append(general_settings)
 
+        # Patience settings
+        max_patience_setting         = SettingEntry('Max patience', MAX_PATIENCE, MAX_PATIENCE_CUR, self.settings.max_patience, 'When using trackers, patience will prevent the clicker to simply click as soon as its triggered.\nEach newly triggered target add 1 stack. Each stack will take <<patience level>> sec to deplete.')
+        max_patience_stack_setting   = SettingEntry('Max patience stack', MAX_PATIENCE_STACK, MAX_PATIENCE_STACK_CUR, self.settings.max_patience_stack, 'Patience stack that would bring the queued up delay to exceed this value will be ignored.')
         patience_settings_layout = [
-            [sg.Text('Max patience', size=(text_width,1), tooltip='When using trackers, patience will prevent the clicker to simply click as soon as its triggered.\nEach newly triggered target add 1 stack. Each stack will take <<patience level>> sec to deplete.'), sg.InputText(key=MAX_PATIENCE, size=(15,1)), sg.Text(key=MAX_PATIENCE_CUR, text=self.settings.max_patience, text_color='light gray', auto_size_text=True)], 
-            [sg.Text('Max patience Stack', size=(text_width,1), tooltip='Patience stack that would bring the queued up delay to exceed this value will be ignored.'), sg.InputText(key=MAX_PATIENCE_STACK, size=(15,1)), sg.Text(key=MAX_PATIENCE_STACK_CUR, text=self.settings.max_patience_stack, text_color='light gray', auto_size_text=True)],
+            max_patience_setting.layout(),
+            max_patience_stack_setting.layout()
         ]
         patience_settings = Collapsible('Patience', patience_settings_layout, PATIENCE_FRAME, COLLAPSE_PATIENCE_FRAME, True)
         self.collapsibles.append(patience_settings)
 
-
+        # CPS settings
+        target_cps_setting = SettingEntry('Target CPS', TARGET_CPS, TARGET_CPS_CUR, self.settings.target_cps, 'Setpoint for CPS pid of fast trgets.')
+        cps_update_setting = SettingEntry('CPS Update Delay (s)', CPS_UPDATE, CPS_UPDATE_CUR, self.settings.cps_update_delay, 'Delay between cps update (fast targets).')
         cps_settings_layout = [
-            [sg.Text('Target CPS', size=(text_width,1), tooltip='Setpoint for CPS pid of fast trgets.'), sg.InputText(key=TARGET_CPS, size=(15,1)), sg.Text(key=TARGET_CPS_CUR, text=self.settings.target_cps, text_color='light gray', auto_size_text=True)], 
-            [sg.Text('CPS Update Delay (s)', size=(text_width,1), tooltip='Delay between cps update (fast targets).'), sg.InputText(key=CPS_UPDATE, size=(15,1)), sg.Text(key=CPS_UPDATE_CUR, text=self.settings.cps_update_delay, text_color='light gray', auto_size_text=True)], 
+            target_cps_setting.layout(),
+            cps_update_setting.layout()
         ]
         cps_settings = Collapsible('CPS', cps_settings_layout, CPS_FRAME, COLLAPSE_CPS_FRAME, True)
         self.collapsibles.append(cps_settings)
 
-
+        # Tracker settings
+        trigger_rate_setting = SettingEntry('Trigger check rate (s)', TRIGGER_CHECK_RATE, TRIGGER_CHECK_RATE_CUR, self.settings.trigger_check_rate, 'Delay (s) between trigger checks (Same as current patience level by default)\nLow values can affect performances')
+        target_zone_setting = SettingEntry('Target zone (px)', TARGET_ZONE, TARGET_ZONE_CUR, self.settings.target_zone, 'Height and width (px) of the area used to check if target has triggered.')
         tracker_settings_layout = [
-            [sg.Text('Trigger check rate (s)', size=(text_width,1), tooltip='Delay (s) between trigger checks (Same as current patience level by default)\nLow values can affect performances'), sg.InputText(key=TRIGGER_CHECK_RATE, size=(15,1)), sg.Text(key=TRIGGER_CHECK_RATE_CUR, text=f'{"Same as patience" if self.settings.trigger_check_rate is None else self.settings.trigger_check_rate}', text_color='light gray', auto_size_text=True)], 
-            [sg.Text('Target zone (px)', size=(text_width,1), tooltip='Height and width (px) of the area used to check if target has triggered.'), sg.InputText(key=TARGET_ZONE, size=(15,1)), sg.Text(key=TARGET_ZONE_CUR, text=self.settings.target_zone, text_color='light gray', auto_size_text=True)], 
+            trigger_rate_setting.layout(),
+            target_zone_setting.layout()
         ]
         tracker_settings = Collapsible('Trackers', tracker_settings_layout, TRACKER_FRAME, COLLAPSE_TRACKER_FRAME, True)
         self.collapsibles.append(tracker_settings)
         
+        # Cookie settings
+        cookie_check_rate_setting = SettingEntry('Check freq (s)', GOLD_FREQ, GOLD_FREQ_CUR, self.settings.check_for_gold_freq, 'Delay (s) between gold cookie seek')
         cookie_settings_layout = [
-            [sg.Text('Check freq (s)', size=(text_width,1), tooltip='Delay (s) between gold cookie seek'), sg.InputText(key=GOLD_FREQ, size=(15,1)), sg.Text(key=GOLD_FREQ_CUR, text=self.settings.check_for_gold_freq, text_color='light gray', auto_size_text=True)], 
+            cookie_check_rate_setting.layout(),
             [sg.Checkbox(default=self.settings.check_for_gold_cookie, text='GOLD DIGGER', key=GOLD_DIGGER, size=(text_width,1), tooltip='If selected, will periodically check and queue up golden cookies\n(For Cookie Clicker game)'),sg.Text(key=GOLD_DIGGER_CUR, text=f'{"CLICKING GOLD!!!" if self.settings.check_for_gold_cookie else "Nope.. T_T"}', text_color='light gray', auto_size_text=True)], 
         ]
         cookie_settings = Collapsible('Golden cookies', cookie_settings_layout, COOKIE_FRAME, COLLAPSE_COOKIE_FRAME, True)
         self.collapsibles.append(cookie_settings)
 
+        # PID settings
+        kp_setting = SettingEntry('KP', KP, KP_CUR, self.settings.p, 'PID P param')
+        ki_setting = SettingEntry('KP', KI, KI_CUR, self.settings.i, 'PID I param')
+        kd_setting = SettingEntry('KP', KD, KD_CUR, self.settings.d, 'PID D param')
         pid_settings_layout = [
-            [sg.Text('KP', size=(text_width,1), tooltip='PID P param'), sg.InputText(key=KP, size=(15,1)), sg.Text(key=KP_CUR, text=self.settings.p, text_color='light gray', auto_size_text=True)], 
-            [sg.Text('KI', size=(text_width,1), tooltip='PID I param'), sg.InputText(key=KI, size=(15,1)), sg.Text(key=KI_CUR, text=self.settings.i, text_color='light gray', auto_size_text=True)], 
-            [sg.Text('KD', size=(text_width,1), tooltip='PID D param'), sg.InputText(key=KD, size=(15,1)), sg.Text(key=KD_CUR, text=self.settings.d, text_color='light gray', auto_size_text=True)], 
+            kp_setting.layout(),
+            ki_setting.layout(),
+            kd_setting.layout()
         ]
         pid_settings = Collapsible('PID', pid_settings_layout, PID_FRAME, COLLAPSE_PID_FRAME, True)
         self.collapsibles.append(pid_settings)
@@ -265,9 +265,9 @@ class App:
         self.toprow = ['priority', 'type', 'clicks', 'state']#, 'pos']
 
         treedata = sg.TreeData()
+        treedata.insert("", "Fast", "Fast", [])
         treedata.insert("", "Tracker", "Tracker", [])
         treedata.insert("", "Idle", "Idle", [])
-        treedata.insert("", "Fast", "Fast", [])
 
         self.target_table=sg.Tree(data=treedata,
             header_font=('Bold, 11'),
@@ -390,6 +390,15 @@ class App:
 
         # Create the window
         self.window = sg.Window("UltimateClicker", layout, location=(1100,100), font=font, element_justification='center')
+
+    def toggle_collapsible(self, collapsible:Collapsible, collapse=None):
+        if collapse is None:
+            collapsible.collapsed = not collapsible.collapsed
+        else:
+            collapsible.collapsed = collapse
+
+        self.window[collapsible.event_key].update(SYMBOL_DOWN if not collapsible.collapsed else SYMBOL_UP)
+        self.window[collapsible.layout_key].update(visible= not collapsible.collapsed)
 
     def display_current(self):
         self.graph_cur.erase()
@@ -606,14 +615,10 @@ class App:
 
     def update_tabs(self):
         settings_visible = self.current_tab == SETTINGS_TAB
-        self.logger.info(f'UI.update_tabs() - Settings tabs are now {"visible" if settings_visible else "hidden"}')            
-        self.window[PATIENCE_FRAME].update(visible=settings_visible)
-        self.window[CPS_FRAME].update(visible=settings_visible)
-        self.window[TRACKER_FRAME].update(visible=settings_visible)
-        self.window[GENERAL_FRAME].update(visible=settings_visible)
-        self.window[COOKIE_FRAME].update(visible=settings_visible)
-        self.window[SUBMIT_SETTINGS].update(visible=settings_visible)
-        self.window[PID_FRAME].update(visible=settings_visible)
+        if not settings_visible:  
+            for coll in self.collapsibles:
+                self.toggle_collapsible(coll, True)     
+            self.logger.info(f'UI.update_tabs() - Settings tabs are now hidden')
 
         track_visible = self.current_tab == TRACK_TAB
         self.window[TARGET_TABLE].update(visible=track_visible)
@@ -1002,12 +1007,12 @@ class App:
                 if event != 'NA':
                     self.logger.info(f'UI.run() - Handling event [{event}]')
 
-                # if values is not None and values[21] == SETTINGS_TAB and self.current_tab != SETTINGS_TAB:
-                #     self.current_tab = SETTINGS_TAB
-                #     self.update_tabs()
-                # elif values is not None and values[21] == TRACK_TAB and self.current_tab != TRACK_TAB:
-                #     self.current_tab = TRACK_TAB
-                #     self.update_tabs()
+                if values is not None and values[4] == SETTINGS_TAB and self.current_tab != SETTINGS_TAB:
+                    self.current_tab = SETTINGS_TAB
+                    self.update_tabs()
+                elif values is not None and values[4] == TRACK_TAB and self.current_tab != TRACK_TAB:
+                    self.current_tab = TRACK_TAB
+                    self.update_tabs()
 
                 # End program if user closes window or
                 # presses the OK button
@@ -1088,13 +1093,11 @@ class App:
                     self.window[BOTTOM_ROW_FRAME].update(visible=False)
                     self.window[CLICK_BTN].update(visible=False)
 
-                # Collapsible settings
+                # Collapsibles
                 elif event.startswith('-COLLAPSE_'): 
                     for collapsible in self.collapsibles:
                         if event == collapsible.event_key:
-                            collapsible.collapsed = not collapsible.collapsed
-                            self.window[collapsible.event_key].update(SYMBOL_DOWN if collapsible.collapsed else SYMBOL_UP)
-                            self.window[collapsible.layout_key].update(visible= not collapsible.collapsed)
+                            self.toggle_collapsible(collapsible)
 
                 elif TARGET_TABLE in event:
                     try:

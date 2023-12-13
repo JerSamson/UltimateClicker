@@ -15,7 +15,10 @@ def collapse(layout, key, start_collapsed=True):
 
 
 class Collapsible:
-    def __init__(self, title, layout, layout_key, event_key, start_collapsed=True) -> None:
+    def __init__(self, title, layout, layout_key, event_key:str, start_collapsed=True) -> None:
+        if not event_key.startswith('-COLLAPSE_'):
+            raise Exception(f"Collabsible layout's event_key should start with '-COLLAPSE_'. (Got {event_key})")
+        
         self.title = title
         self.layout_key = layout_key
         self.event_key = event_key

@@ -1,8 +1,22 @@
 from singleton import Singleton
+import PySimpleGUI as sg
 
-class settingsEntry:
-    def __init__(self, name) -> None:
-        pass
+class SettingEntry:
+    def __init__(self, text, input_key, cur_val_key, cur_value, tooltip=None, text_width=20, text_color='light gray') -> None:
+        self.text = text
+        self.input_key = input_key
+        self.cur_val_key = cur_val_key
+        self.cur_value = cur_value
+        self.text_color = text_color
+        self.text_width = text_width
+        self.tooltip = tooltip
+        
+    def layout(self):
+        return [
+            sg.Text(text=self.text, size=(self.text_width,1), tooltip=self.tooltip),
+            sg.InputText(key=self.input_key, size=(15,1)),
+            sg.Text(key=self.cur_val_key, text=self.cur_value, text_color=self.text_color, auto_size_text=True)
+            ]
 
 class Settings(metaclass=Singleton):
     def __init__(self) -> None:
