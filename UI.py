@@ -10,7 +10,7 @@ import cursor
 import csv
 import os 
 
-from Settings import Settings, SettingEntry
+from Settings import *
 from event_graph import *
 
 millnames = ['',' Thousand',' Million',' Billion',' Trillion']
@@ -65,62 +65,11 @@ COLOR_PREVIEW_SIZE       = (10,2)
      
 TRACK_TAB                = '-TRACK_TAB-'
      
-# SETTINGS    
-SETTINGS_TAB             = '-SETTINGS_TAB-'
-     
-#   GENERAL
-GENERAL_FRAME            = '-GENERAL_FRAME-'
-COLLAPSE_GENERAL_FRAME   = '-COLLAPSE_GENERAL_FRAME-'
-SAVE_FOLDER              = '-SAVE_DIR-'
-SAVE_FOLDER_CUR          = '-SAVE_DIR_CUR-'
-UI_UPDATE                = '-UI_UPDATE-'
-UI_UPDATE_CUR            = '-UI_UPDATE_CUR-'
-AUTOSAVE_FREQ            = '-AUTOSAVE_FREQ-'
-AUTOSAVE_FREQ_CUR        = '-AUTOSAVE_FREQ_CUR-'
 
-#   PATIENCE
-PATIENCE_FRAME           = '-PATIENCE_FRAME-'
-COLLAPSE_PATIENCE_FRAME  = '-COLLAPSE_PATIENCE_FRAME-'
-MAX_PATIENCE             = '-MAX_PATIENCE-'
-MAX_PATIENCE_CUR         = '-MAX_PATIENCE_CUR-'
-MAX_PATIENCE_STACK       = '-MAX_PATIENCE_STACK-'
-MAX_PATIENCE_STACK_CUR   = '-MAX_PATIENCE_STACK_CUR-'
-
-#   CPS
-CPS_FRAME                = '-CPS_FRAME-'
-COLLAPSE_CPS_FRAME       = '-COLLAPSE_CPS_FRAME-'
-TARGET_CPS               = '-TARGET_CPS-'
-TARGET_CPS_CUR           = '-TARGET_CPS_CUR-'
-CPS_UPDATE               = '-CPS_UPDATE-'
-CPS_UPDATE_CUR           = '-CPS_UPDATE_CUR-'
-
-#   TRACKER
-TRACKER_FRAME            = '-TRACKER_FRAME-'
-COLLAPSE_TRACKER_FRAME   = '-COLLAPSE_TRACKER_FRAME-'
-TARGET_ZONE              = '-TARGET_ZONE-'
-TARGET_ZONE_CUR          = '-TARGET_ZONE_CUR-'
-TRIGGER_CHECK_RATE       = '-TRIGGERCHECK-'
-TRIGGER_CHECK_RATE_CUR   = '-TRIGGERCHECKCUR-'
-
-#   COOKIE
-COOKIE_FRAME             = '-COOKIE_FRAME-'
-COLLAPSE_COOKIE_FRAME    = '-COLLAPSE_COOKIE_FRAME-'
-GOLD_DIGGER              = '-GOLD_DIG'
-GOLD_DIGGER_CUR          = '-GOLD_DIG_CUR'
-GOLD_FREQ                = '-GOLD_FREQ-'
-GOLD_FREQ_CUR            = '-GOLD_FREQ_CUR-'
-
-#   PID
-PID_FRAME                = '-PID_FRAME-'
-COLLAPSE_PID_FRAME       = '-COLLAPSE__PID_FRAME-'
-KP                       = '-KP-'
-KP_CUR                   = '-KP_CUR-'
-KI                       = '-KI-'
-KI_CUR                   = '-KI_CUR-'
-KD                       = '-KD-'
-KD_CUR                   = '-KD_CUR-'
 
 SUBMIT_SETTINGS          = '-SUBMIT_SETTINGS-'
+RESET_SETTINGS           = '-RESET_SETTINGS-'
+SAVE_SETTINGS            = '-SAVE_SETTINGS-'
 
 def rgb_to_hex(r, g, b):
     return '#{:02x}{:02x}{:02x}'.format(r, g, b)
@@ -144,6 +93,7 @@ class App:
         self.mode = detectionMode.fast
         self.current_tab = None
         self.cwd = os.path.dirname(os.path.realpath(__file__)) + '\\'
+        self.userdata_dir = self.cwd + 'UserData\\'
         self.last_save_file = 'last_save'
         self.track_target_lock = Lock()
         self.selected_target = None
@@ -170,11 +120,23 @@ class App:
         text_width = 20
         setting_frame_title_color = 'dark slate gray'
 
-        # General settings
-        save_dir_setting   = SettingEntry('Saves Dir', SAVE_FOLDER, SAVE_FOLDER_CUR, self.settings.save_dir, 'Directory to load and save data')
-        UI_refresh_setting = SettingEntry('UI refresh (ms)', UI_UPDATE, UI_UPDATE_CUR, self.settings.ui_update, 'Delay (ms) between UI refresh while running.\nLow values can affect performances')
-        autosave_setting   = SettingEntry('Autosave (s)', AUTOSAVE_FREQ, AUTOSAVE_FREQ_CUR, self.settings.autosave_freq, 'Delay (s) between Autosaves (0 for no autosave)')
+        save_dir_setting            = self.settings.add_entry(SettingEntry('Save Directory', SAVE_FOLDER, SAVE_FOLDER_CUR, str, 'Directory to load and save data'))
+        UI_refresh_setting          = self.settings.add_entry(SettingEntry('UI refresh (ms)', UI_UPDATE, UI_UPDATE_CUR, int, 'Delay (ms) between UI refresh while running.\nLow values can affect performances'))
+        autosave_setting            = self.settings.add_entry(SettingEntry('Autosave (s)', AUTOSAVE_FREQ, AUTOSAVE_FREQ_CUR, int, 'Delay (s) between Autosaves (0 for no autosave)'))
+        max_patience_setting        = self.settings.add_entry(SettingEntry('Max patience', MAX_PATIENCE, MAX_PATIENCE_CUR, int, 'When using trackers, patience will prevent the clicker to simply click as soon as its triggered.\nEach newly triggered target add 1 stack. Each stack will take <<patience level>> sec to deplete.'))
+        max_patience_stack_setting  = self.settings.add_entry(SettingEntry('Max patience stack', MAX_PATIENCE_STACK, MAX_PATIENCE_STACK_CUR, int, 'Patience stack that would bring the queued up delay to exceed this value will be ignored.'))
+        target_cps_setting          = self.settings.add_entry(SettingEntry('Target CPS', TARGET_CPS, TARGET_CPS_CUR, int, 'Setpoint for CPS pid of fast trgets.'))
+        cps_update_setting          = self.settings.add_entry(SettingEntry('CPS Update Delay (s)', CPS_UPDATE, CPS_UPDATE_CUR, float, 'Delay between cps update (fast targets).'))
+        trigger_rate_setting        = self.settings.add_entry(SettingEntry('Trigger check rate (s)', TRIGGER_CHECK_RATE, TRIGGER_CHECK_RATE_CUR, int, 'Delay (s) between trigger checks (Same as current patience level [-1] by default)\nLow values can affect performances'))
+        target_zone_setting         = self.settings.add_entry(SettingEntry('Target zone (px)', TARGET_ZONE, TARGET_ZONE_CUR, int, 'Height and width (px) of the area used to check if target has triggered.'))
+        cookie_check_rate_setting   = self.settings.add_entry(SettingEntry('Check freq (s)', GOLD_FREQ, GOLD_FREQ_CUR, int, 'Delay (s) between gold cookie seek'))
+        kp_setting                  = self.settings.add_entry(SettingEntry('KP', KP, KP_CUR, float, 'PID P param'))
+        ki_setting                  = self.settings.add_entry(SettingEntry('KI', KI, KI_CUR, float, 'PID I param'))
+        kd_setting                  = self.settings.add_entry(SettingEntry('KD', KD, KD_CUR, float, 'PID D param'))
 
+        self.settings.load()
+
+        # General settings
         general_settings_layout = [
             save_dir_setting.layout(),
             UI_refresh_setting.layout(),
@@ -184,8 +146,6 @@ class App:
         self.collapsibles.append(general_settings)
 
         # Patience settings
-        max_patience_setting         = SettingEntry('Max patience', MAX_PATIENCE, MAX_PATIENCE_CUR, self.settings.max_patience, 'When using trackers, patience will prevent the clicker to simply click as soon as its triggered.\nEach newly triggered target add 1 stack. Each stack will take <<patience level>> sec to deplete.')
-        max_patience_stack_setting   = SettingEntry('Max patience stack', MAX_PATIENCE_STACK, MAX_PATIENCE_STACK_CUR, self.settings.max_patience_stack, 'Patience stack that would bring the queued up delay to exceed this value will be ignored.')
         patience_settings_layout = [
             max_patience_setting.layout(),
             max_patience_stack_setting.layout()
@@ -194,8 +154,6 @@ class App:
         self.collapsibles.append(patience_settings)
 
         # CPS settings
-        target_cps_setting = SettingEntry('Target CPS', TARGET_CPS, TARGET_CPS_CUR, self.settings.target_cps, 'Setpoint for CPS pid of fast trgets.')
-        cps_update_setting = SettingEntry('CPS Update Delay (s)', CPS_UPDATE, CPS_UPDATE_CUR, self.settings.cps_update_delay, 'Delay between cps update (fast targets).')
         cps_settings_layout = [
             target_cps_setting.layout(),
             cps_update_setting.layout()
@@ -204,8 +162,6 @@ class App:
         self.collapsibles.append(cps_settings)
 
         # Tracker settings
-        trigger_rate_setting = SettingEntry('Trigger check rate (s)', TRIGGER_CHECK_RATE, TRIGGER_CHECK_RATE_CUR, self.settings.trigger_check_rate, 'Delay (s) between trigger checks (Same as current patience level by default)\nLow values can affect performances')
-        target_zone_setting = SettingEntry('Target zone (px)', TARGET_ZONE, TARGET_ZONE_CUR, self.settings.target_zone, 'Height and width (px) of the area used to check if target has triggered.')
         tracker_settings_layout = [
             trigger_rate_setting.layout(),
             target_zone_setting.layout()
@@ -214,7 +170,6 @@ class App:
         self.collapsibles.append(tracker_settings)
         
         # Cookie settings
-        cookie_check_rate_setting = SettingEntry('Check freq (s)', GOLD_FREQ, GOLD_FREQ_CUR, self.settings.check_for_gold_freq, 'Delay (s) between gold cookie seek')
         cookie_settings_layout = [
             cookie_check_rate_setting.layout(),
             [sg.Checkbox(default=self.settings.check_for_gold_cookie, text='GOLD DIGGER', key=GOLD_DIGGER, size=(text_width,1), tooltip='If selected, will periodically check and queue up golden cookies\n(For Cookie Clicker game)'),sg.Text(key=GOLD_DIGGER_CUR, text=f'{"CLICKING GOLD!!!" if self.settings.check_for_gold_cookie else "Nope.. T_T"}', text_color='light gray', auto_size_text=True)], 
@@ -223,9 +178,6 @@ class App:
         self.collapsibles.append(cookie_settings)
 
         # PID settings
-        kp_setting = SettingEntry('KP', KP, KP_CUR, self.settings.p, 'PID P param')
-        ki_setting = SettingEntry('KP', KI, KI_CUR, self.settings.i, 'PID I param')
-        kd_setting = SettingEntry('KP', KD, KD_CUR, self.settings.d, 'PID D param')
         pid_settings_layout = [
             kp_setting.layout(),
             ki_setting.layout(),
@@ -253,7 +205,11 @@ class App:
             cookie_settings.permanent_section,
             cookie_settings.collapsible_section,
 
-            [sg.Button(button_text='Update', key=SUBMIT_SETTINGS), sg.Sizer(0,0)],
+            [
+                sg.Button(button_text='Apply', key=SUBMIT_SETTINGS),
+                sg.Button(button_text='Apply and save',  key=SAVE_SETTINGS),
+                sg.Button(button_text='Reset to default', key=RESET_SETTINGS),
+                sg.Sizer(0,0)],
             ]
 
         # =========================== RIGHT CLICK MENU ===========================
@@ -333,7 +289,7 @@ class App:
             sg.Sizer(0, 0)
             ]
 
-        self.patience_slider = sg.Slider(range=(0, self.settings.max_patience), default_value=5,
+        self.patience_slider = sg.Slider(range=(0, self.settings.get(MAX_PATIENCE)), default_value=5,
                 expand_x=True, enable_events=True,
                 orientation='horizontal', key=PATIENCE_SLIDER, tooltip='Patience level\nWait increment for each newly triggered tracker')
 
@@ -362,7 +318,7 @@ class App:
             [self.eventgraph.graph, sg.Sizer(0,0)],
             [sg.Sizer(0,0), self.patience_slider],
             [sg.Sizer(0,0), sg.ProgressBar(self.queue.patience_level, orientation='h', expand_x=True, size=(20, 5),  key=PATIENCE_PROGRESS_2, visible=False, bar_color='blue')],
-            [sg.Sizer(0,0), sg.ProgressBar(self.settings.max_patience_stack, orientation='h', expand_x=True, size=(20, 20), border_width= 3,  key=PATIENCE_PROGRESS, visible=False)],
+            [sg.Sizer(0,0), sg.ProgressBar(self.settings.get(MAX_PATIENCE_STACK), orientation='h', expand_x=True, size=(20, 20), border_width= 3,  key=PATIENCE_PROGRESS, visible=False)],
             details,
             [self.target_table, sg.Sizer(0,0)],
             [sg.Sizer(0,0)],
@@ -479,18 +435,18 @@ class App:
             return None
 
     def choose_load_file(self):
-        files = [f for f in os.listdir(self.cwd + self.settings.save_dir)]
+        files = [f for f in os.listdir(self.userdata_dir + self.settings.get(SAVE_FOLDER))]
         return self.Choose_file_popup(text="Choose file to load", data=files)
 
     def choose_save_file(self):
-        files = [f for f in os.listdir(self.cwd + self.settings.save_dir)]
+        files = [f for f in os.listdir(self.userdata_dir + self.settings.get(SAVE_FOLDER))]
         return self.Choose_file_popup(text="Choose file to save", data=files, can_create=True)
 
     def load_targets(self, save_file):
         self.logger.info(f'load_targets - Loading targets from {save_file}')            
         try:
             self.queue.clear_targets()
-            file_path = self.cwd + self.settings.save_dir + save_file
+            file_path = self.userdata_dir + self.settings.get(SAVE_FOLDER) + save_file
             screenshot = self.cam.get_screen(caller='UI.LoadTargets()')
             with open(file_path, 'r') as file:
                 csvreader = csv.reader(file)
@@ -502,7 +458,7 @@ class App:
                     tar = None
                     typ = row[0]
                     if typ == 'Tracker':
-                        tar = TrackerTarget(int(row[1]), int(row[2]), self.settings.target_zone, detectionMode(int(row[3])), initial_screenshot=screenshot)
+                        tar = TrackerTarget(int(row[1]), int(row[2]), self.settings.get(TARGET_ZONE), detectionMode(int(row[3])), initial_screenshot=screenshot)
                     elif typ == 'Fast':
                         tar = FastTarget(int(row[1]), int(row[2]), initial_screenshot=screenshot)
                     elif typ == 'Idle':
@@ -530,14 +486,14 @@ class App:
 
     def update_last_save(self, last_save):
         self.logger.info(f'UI.update_last_save() - Updating last save to {last_save}')            
-        with open(self.cwd+self.last_save_file, 'w', newline='') as file:
+        with open(self.userdata_dir + self.last_save_file, 'w', newline='') as file:
             writer = csv.writer(file)
             writer.writerow(['last_save', last_save])
             self.last_saved = last_save
 
     def get_last_saved(self):
         if self.last_saved is None:
-            with open(self.cwd+self.last_save_file, 'r') as file:
+            with open(self.userdata_dir + self.last_save_file, 'r') as file:
                 csvreader = csv.reader(file)
                 for row in csvreader:
                     if row[0] == 'last_save':
@@ -549,7 +505,7 @@ class App:
             return
         try:
             self.logger.info(f'save_targets - Saving targets to {save_file}')            
-            file_path = self.cwd + self.settings.save_dir + save_file
+            file_path = self.userdata_dir + self.settings.get(SAVE_FOLDER) + save_file
             with open(file_path, 'w', newline='') as file:
                 writer = csv.writer(file)
                 for tar in self.targets:
@@ -753,12 +709,13 @@ class App:
             if self.is_click_inside_app(x, y):
                 self.logger.debug('Click in app')            
                 return
+            target_zone = self.settings.get(TARGET_ZONE)
             if self.mode == detectionMode.same:
-                tar = TrackerTarget(x, y, self.settings.target_zone, detectionMode.same)
+                tar = TrackerTarget(x, y, target_zone, detectionMode.same)
             elif self.mode == detectionMode.different:
-                tar = TrackerTarget(x, y, self.settings.target_zone, detectionMode.different)
+                tar = TrackerTarget(x, y, target_zone, detectionMode.different)
             elif self.mode == detectionMode.change:
-                tar = TrackerTarget(x, y, self.settings.target_zone, detectionMode.change)
+                tar = TrackerTarget(x, y, target_zone, detectionMode.change)
             elif self.mode == detectionMode.fast:
                 if self.queue.has_fast_target():
                     self.remove_target(self.queue.fast_target)
@@ -816,7 +773,7 @@ class App:
                 # last_click_id = self.queue.last_click.targetid if self.queue.last_click is not None else 'None'
                 # self.window[NEXT_TARGET].update(value=f'Next Target ID: Waiting for target\nLast Target ID: {last_click_id}')
             else:
-                self.window[PATIENCE_PROGRESS].update(current_count=self.queue.additionnal_wait, bar_color='green', max=self.settings.max_patience_stack)
+                self.window[PATIENCE_PROGRESS].update(current_count=self.queue.additionnal_wait, bar_color='green', max=self.settings.get(MAX_PATIENCE_STACK))
                 self.window[PATIENCE_PROGRESS_2].update(current_count=self.queue.wait_prog, max=self.queue.patience_level, bar_color='green')
                 # if self.queue.next_target is not None:
                     # last_click_id = self.queue.last_click.targetid if self.queue.last_click is not None else 'None'
@@ -869,128 +826,141 @@ class App:
 
         value = values[SAVE_FOLDER]
         if value != '':
-            self.settings.save_dir = values[SAVE_FOLDER]
-            self.window[SAVE_FOLDER_CUR].update(value=self.settings.save_dir)
-            self.window[SAVE_FOLDER].update(value='')
+            self.settings.set(SAVE_FOLDER, values[SAVE_FOLDER])
+        self.window[SAVE_FOLDER_CUR].update(value=self.settings.get(SAVE_FOLDER))
+        self.window[SAVE_FOLDER].update(value='')
 
         value = values[TARGET_ZONE]
         if value != '' :
             if value.isdigit() and int(value) > 1:
-                self.settings.target_zone = int(value)
-                self.window[TARGET_ZONE_CUR].update(value=self.settings.target_zone)
-                self.window[TARGET_ZONE].update(value='')
+                self.settings.set(TARGET_ZONE, int(value))
+
             else:
                 self.logger.warn(f'UI.update_settings - invalid target zone value ({value})')            
+        self.window[TARGET_ZONE_CUR].update(value=self.settings.get(TARGET_ZONE))
+        self.window[TARGET_ZONE].update(value='')
 
         value = values[UI_UPDATE]
         if value != '':
             if value.isdigit() and int(value) >= 1:
-                self.settings.ui_update = int(value)
-                self.window[UI_UPDATE_CUR].update(value=self.settings.ui_update)
-                self.window[UI_UPDATE].update(value='')
+                self.settings.set(UI_UPDATE, int(value))
+
             else:
                 self.logger.warn(f'UI.update_settings - invalid UI update rate value ({value})')
+        self.window[UI_UPDATE_CUR].update(value=self.settings.get(UI_UPDATE))
+        self.window[UI_UPDATE].update(value='')
 
         value = values[TRIGGER_CHECK_RATE]
         if value != '':
             if value.isdigit() and int(value) >= 1:
-                self.settings.trigger_check_rate = int(value)
-                self.window[TRIGGER_CHECK_RATE_CUR].update(value=self.settings.trigger_check_rate)
-                self.window[TRIGGER_CHECK_RATE].update(value='')
+                self.settings.set(TRIGGER_CHECK_RATE, int(value))
+
             else:
                 self.logger.warn(f'UI.update_settings - invalid trigger check rate value ({value})')
+        current_value = self.settings.get(TRIGGER_CHECK_RATE)
+        display_value = current_value if current_value > 0 else str(current_value) + "(Same as patience)"
+        self.window[TRIGGER_CHECK_RATE_CUR].update(value=display_value)
+        self.window[TRIGGER_CHECK_RATE].update(value='')
 
         value = values[GOLD_DIGGER]
         if value != '':
             if isinstance(value, bool):
                 self.settings.check_for_gold_cookie = value
-                self.window[GOLD_DIGGER_CUR].update(value=f'{"CLICKING GOLD!!!" if self.settings.check_for_gold_cookie else "Nope.. T_T"}')
-                self.window[GOLD_DIGGER].update(value='')
+
             else:
                 self.logger.warn(f'UI.update_settings - invalid GOLD_DIGGER value ({value})')
+        self.window[GOLD_DIGGER_CUR].update(value=f'{"CLICKING GOLD!!!" if self.settings.check_for_gold_cookie else "Nope.. T_T"}')
+        self.window[GOLD_DIGGER].update(value='')
 
         value = values[GOLD_FREQ]
         if value != '':
             if value.isdigit() and int(value) >= 1:
-                self.settings.check_for_gold_freq = int(value)
-                self.window[GOLD_FREQ_CUR].update(value=self.settings.check_for_gold_freq)
-                self.window[GOLD_FREQ].update(value='')
+                self.settings.set(GOLD_FREQ, int(value))
+
             else:
                 self.logger.warn(f'UI.update_settings - invalid gold seek freq value ({value})')
+        self.window[GOLD_FREQ_CUR].update(value=self.settings.get(GOLD_FREQ))
+        self.window[GOLD_FREQ].update(value='')
 
         value = values[MAX_PATIENCE]
         if value != '':
             if value.isdigit() and int(value) > 0:
-                self.settings.max_patience = int(value)
-                self.window[MAX_PATIENCE_CUR].update(value=self.settings.max_patience)
-                self.window[PATIENCE_SLIDER].update(range=(0, self.settings.max_patience))
-                self.window[MAX_PATIENCE].update(value='')
+                self.settings.set(MAX_PATIENCE, int(value))
+
             else:
                 self.logger.warn(f'UI.update_settings - invalid max patience value ({value})')
+        self.window[MAX_PATIENCE_CUR].update(value=self.settings.get(MAX_PATIENCE))
+        self.window[PATIENCE_SLIDER].update(range=(0, self.settings.get(MAX_PATIENCE)))
+        self.window[MAX_PATIENCE].update(value='')
 
         value = values[MAX_PATIENCE_STACK]
         if value != '':
             if value.isdigit() and int(value) > 0:
-                self.settings.max_patience_stack = int(value)
-                self.window[MAX_PATIENCE_STACK_CUR].update(value=self.settings.max_patience_stack)
-                self.window[PATIENCE_PROGRESS].update(max=self.settings.max_patience_stack)
-                self.window[MAX_PATIENCE_STACK].update(value='')
+                self.settings.set(MAX_PATIENCE_STACK, int(value))
+
             else:
                 self.logger.warn(f'UI.update_settings - invalid max patience value ({value})')
+        self.window[MAX_PATIENCE_STACK_CUR].update(value=self.settings.get(MAX_PATIENCE_STACK))
+        self.window[PATIENCE_PROGRESS].update(max=self.settings.get(MAX_PATIENCE_STACK))
+        self.window[MAX_PATIENCE_STACK].update(value='')
 
         value = values[TARGET_CPS]
         if value != '':
             if value.isdigit() and int(value) >= 0:
-                self.settings.target_cps = int(value)
-                self.window[TARGET_CPS_CUR].update(value=self.settings.target_cps)
-                self.window[TARGET_CPS].update(value='')
+                self.settings.set(TARGET_CPS, int(value))
+
             else:
                 self.logger.warn(f'UI.update_settings - invalid Target cps value ({value})')
+        self.window[TARGET_CPS_CUR].update(value=self.settings.get(TARGET_CPS))
+        self.window[TARGET_CPS].update(value='')
 
         value = values[CPS_UPDATE]
         if value != '':
             if value.replace('.','',1).isdigit() and float(value) >= 0:
-                self.settings.cps_update_delay = float(value)
-                self.window[CPS_UPDATE_CUR].update(value=self.settings.cps_update_delay)
-                self.window[CPS_UPDATE].update(value='')
+                self.settings.set(CPS_UPDATE, float(value))
+
             else:
                 self.logger.warn(f'UI.update_settings - invalid cps update value ({value})')
+        self.window[CPS_UPDATE_CUR].update(value=self.settings.get(CPS_UPDATE))
+        self.window[CPS_UPDATE].update(value='')
 
         value = values[AUTOSAVE_FREQ]
         if value != '':
             if value.isdigit() and int(value) >= 0:
-                self.settings.autosave_freq = int(value)
-                self.window[AUTOSAVE_FREQ_CUR].update(value=self.settings.autosave_freq)
-                self.window[AUTOSAVE_FREQ].update(value='')
+                self.settings.set(AUTOSAVE_FREQ, int(value))
+
             else:
                 self.logger.warn(f'UI.update_settings - invalid autosave_freq value ({value})')
+        self.window[AUTOSAVE_FREQ_CUR].update(value=self.settings.get(AUTOSAVE_FREQ))
+        self.window[AUTOSAVE_FREQ].update(value='')
 
         value = values[KP]
         if value != '':
             if value.replace('.','',1).replace('-','',1).isdigit():
-                self.settings.p = float(value)
-                self.window[KP_CUR].update(value=self.settings.p)
-                self.window[KP].update(value='')
+                self.settings.set(KP, float(value))
+
             else:
                 self.logger.warn(f'UI.update_settings - invalid KP value ({value})')
+        self.window[KP_CUR].update(value=self.settings.get(KP))
+        self.window[KP].update(value='')
 
         value = values[KI]
         if value != '':
             if value.replace('.','',1).replace('-','',1).isdigit():
-                self.settings.i = float(value)
-                self.window[KI_CUR].update(value=self.settings.i)
-                self.window[KI].update(value='')
+                self.settings.set(KI, float(value))
             else:
                 self.logger.warn(f'UI.update_settings - invalid KI value ({value})')
-
+        self.window[KI_CUR].update(value=self.settings.get(KI))
+        self.window[KI].update(value='')
+        
         value = values[KD]
         if value != '':
             if value.replace('.','',1).replace('-','',1).isdigit():
-                self.settings.d = float(value)
-                self.window[KD_CUR].update(value=self.settings.d)
-                self.window[KD].update(value='')
+                self.settings.set(KD, float(value))
             else:
                 self.logger.warn(f'UI.update_settings - invalid KD value ({value})')
+        self.window[KD_CUR].update(value=self.settings.get(KD))
+        self.window[KD].update(value='')
 
     def run(self):
         try:
@@ -1002,7 +972,7 @@ class App:
 
             while True:
                 start = time.time()
-                timeout = 250 if not self.running else self.settings.ui_update
+                timeout = 250 if not self.running else self.settings.get(UI_UPDATE)
                 event, values = self.window.read(timeout=timeout, timeout_key='NA')
                 if event != 'NA':
                     self.logger.info(f'UI.run() - Handling event [{event}]')
@@ -1027,8 +997,9 @@ class App:
                     self.targets = self.queue.targets
 
                 if self.running:
-                    if self.settings.autosave_freq > 0 and time.time() - self.last_autosave >= self.settings.autosave_freq*60:
-                        self.logger.info(f'UI.run() - Automatic save (Set for every {self.settings.autosave_freq} minutes)')
+                    autosave_freq = self.settings.get(AUTOSAVE_FREQ)
+                    if autosave_freq > 0 and time.time() - self.last_autosave >= autosave_freq*60:
+                        self.logger.info(f'UI.run() - Automatic save (Set for every {autosave_freq} minutes)')
                         self.eventgraph.add_event_entry(EventEntry(time.time(), 'autosave'))
                         self.autosave()
                     self.settings.run_time += (time.time()-start)
@@ -1129,6 +1100,14 @@ class App:
                     self.window[TARGET_TABLE].update(visible=not self.target_table.visible)
 
                 elif event == SUBMIT_SETTINGS:
+                    self.update_settings(values)
+
+                elif event == SAVE_SETTINGS:
+                    self.update_settings(values)
+                    self.settings.save()
+
+                elif event == RESET_SETTINGS:
+                    self.settings.reset_userdata()
                     self.update_settings(values)
 
             self.click_listener_thread.stop()

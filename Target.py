@@ -16,7 +16,7 @@ from RepeatedTimer import RepeatedTimer
 from simple_pid import PID
 from event_graph import EventGraph, CpsEntry
 from logger import Logger
-from Settings import Settings
+from Settings import *
 
 import numpy as np
 
@@ -196,8 +196,8 @@ class FastTarget(BaseTarget):
         self.highest_cps  = 0
         self.last_handle  = time.time()
         self.last_nb_clicks = 0
-        self.original_delay = (1/self.settings.target_cps)
-        self.pid = PID(self.settings.p, self.settings.i, self.settings.d, output_limits=(0.00001,1), proportional_on_measurement = True)
+        self.original_delay = (1/self.settings.get(TARGET_CPS))
+        self.pid = PID(self.settings.get(KP), self.settings.get(KI), self.settings.get(KD), output_limits=(0.00001,1), proportional_on_measurement = True)
         # self.pid = PID(-0.0000005, -0.000050, -0.00000000125, output_limits=(0.00001,1), proportional_on_measurement = True)
         self.last_cps_time = 0
         self.start_time    = time.time()
@@ -247,15 +247,16 @@ class FastTarget(BaseTarget):
         self.n_cps_sample = 0
         self.first_click_time = 0
 
-        self.pid.Kp = self.settings.p
-        self.pid.Ki = self.settings.i
-        self.pid.Kd = self.settings.d
+        self.pid.Kp = self.settings.get(KP)
+        self.pid.Ki = self.settings.get(KI)
+        self.pid.Kd = self.settings.get(KD)
 
-        if self.last_target_cps != self.settings.target_cps:
-            self.last_target_cps = self.settings.target_cps
-            if self.settings.target_cps > 0:
-                self.original_delay = (1/self.settings.target_cps)
-                self.pid.setpoint = self.settings.target_cps
+        target_cps = self.settings.get(TARGET_CPS)
+        if self.last_target_cps != target_cps:
+            self.last_target_cps = target_cps
+            if target_cps > 0:
+                self.original_delay = (1/target_cps)
+                self.pid.setpoint = target_cps
                 self.pid.output_limits = (0, self.original_delay)
 
             self.pid.reset()
@@ -283,12 +284,12 @@ class FastTarget(BaseTarget):
 
             self.click()
 
-            if time.time() - self.last_cps_time > self.settings.cps_update_delay:
+            if time.time() - self.last_cps_time > self.settings.get(CPS_UPDATE):
                 self.update_cps()
 
             self.last_handle = time.time()
 
-            if self.settings.target_cps > 0:
+            if self.settings.get(TARGET_CPS) > 0:
                 time.sleep(self.delay)
 
             return True
@@ -313,7 +314,7 @@ class FastTarget(BaseTarget):
         if self.times_clicked > 100:
             self.approxCpsAverage(self.cps)
 
-        if self.settings.target_cps > 0:
+        if self.settings.get(TARGET_CPS) > 0:
             pid_correction=self.pid(self.cps)
             self.delay = self.original_delay - pid_correction 
             self.logger.debug(f'FastTarget.update_cps - pid correction: {pid_correction}, delay:{self.delay}')

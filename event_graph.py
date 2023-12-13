@@ -3,7 +3,7 @@ import math
 import time
 import PySimpleGUI as sg
 from singleton import Singleton
-from Settings import Settings
+from Settings import *
 from numba import jit
 from logger import Logger
 
@@ -136,8 +136,9 @@ class EventGraph(metaclass=Singleton):
 
     def adapt_graph_size(self):
         if self.has_cps_entries():
+            target_cps = self.settings.get(TARGET_CPS)
             max_cps_entry = max([entry.cps for entry in self.cps_entries])
-            max_cps_entry = max([max_cps_entry, self.settings.target_cps])
+            max_cps_entry = max([max_cps_entry, target_cps])
 
             max_cps_timestamp = max([entry.normalized_timestamp for entry in self.cps_entries])
             min_cps_timestamp = min([entry.normalized_timestamp for entry in self.cps_entries])
@@ -148,8 +149,8 @@ class EventGraph(metaclass=Singleton):
 
             top_right_x = max_cps_timestamp
 
-            if self.settings.target_cps > 0 and max_cps_entry < max_cps_entry + self.settings.target_cps:
-                top_right_y = max_cps_entry + self.settings.target_cps
+            if target_cps > 0 and max_cps_entry < max_cps_entry + target_cps:
+                top_right_y = max_cps_entry + target_cps
             else:
                 top_right_y = max_cps_entry + 50
             self.top_right = (top_right_x, top_right_y)
@@ -176,8 +177,9 @@ class EventGraph(metaclass=Singleton):
 
 
     def draw_cps(self):
-        if self.settings.target_cps > 0: # Draw target line
-            self.graph.draw_line((self.graph.BottomLeft[0], self.settings.target_cps), (self.top_right[0], self.settings.target_cps), width=1)
+        target_cps = self.settings.get(TARGET_CPS)
+        if target_cps > 0: # Draw target line
+            self.graph.draw_line((self.graph.BottomLeft[0], target_cps), (self.top_right[0], target_cps), width=1)
 
         if len(self.cps_entries) > 0:
             points = []

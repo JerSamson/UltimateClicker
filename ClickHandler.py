@@ -4,7 +4,7 @@ import time
 from ClickQueue import *
 from GoldCookie import SEEK_GOLDEN_COOKIES
 from screenrecorder import ScreenRecorder
-from Settings import Settings
+from Settings import *
 from event_graph import EventGraph, EventEntry
 from logger import Logger
 
@@ -84,7 +84,7 @@ class ClickHandler:
         
         self.add_wait_lock.acquire()
         try:
-            if self.additionnal_wait + inc <= self.settings.max_patience_stack and self.additionnal_wait + inc >= 0:
+            if self.additionnal_wait + inc <= self.settings.get(MAX_PATIENCE_STACK) and self.additionnal_wait + inc >= 0:
                 self.additionnal_wait += inc
                 if tar is not None:
                     self.logger.info(f'INFO - Added increment for target {tar.targetid}')
@@ -289,7 +289,8 @@ class ClickHandler:
             except Exception as e:
                 self.logger.error(f'ClickHandler.update_thread() - thread failed ({e})')
 
-            tracker_Interval = self.settings.trigger_check_rate if self.settings.trigger_check_rate is not None else self.patience_level if self.patience_level > 0 else 1 #self.patience_level/2
+            check_rate = self.settings.get(TRIGGER_CHECK_RATE)
+            tracker_Interval = check_rate if check_rate > 0 else self.patience_level if self.patience_level > 0 else 1 #self.patience_level/2
             stop = time.time()
 
             execution_time = (stop - start)
@@ -346,7 +347,7 @@ class ClickHandler:
 
     def SeekAndClickGOOOOLD(self):
         self.logger.info('ClickHandler.SeekAndClickGOOOOLD() - GOLD DIGGER thread started')
-        normal_wait = self.settings.check_for_gold_freq
+        normal_wait = self.settings.get(GOLD_FREQ)
         streak_cnt = 0
         # TODO : Streak up to near 0 sec delay
         while self.running:
