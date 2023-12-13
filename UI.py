@@ -859,7 +859,7 @@ class App:
             else:
                 self.logger.warn(f'UI.update_settings - invalid trigger check rate value ({value})')
         current_value = self.settings.get(TRIGGER_CHECK_RATE)
-        display_value = current_value if current_value > 0 else str(current_value) + "(Same as patience)"
+        display_value = current_value if current_value > 0 else str(current_value) + " (Same as patience)"
         self.window[TRIGGER_CHECK_RATE_CUR].update(value=display_value)
         self.window[TRIGGER_CHECK_RATE].update(value='')
 
@@ -871,7 +871,6 @@ class App:
             else:
                 self.logger.warn(f'UI.update_settings - invalid GOLD_DIGGER value ({value})')
         self.window[GOLD_DIGGER_CUR].update(value=f'{"CLICKING GOLD!!!" if self.settings.check_for_gold_cookie else "Nope.. T_T"}')
-        self.window[GOLD_DIGGER].update(value='')
 
         value = values[GOLD_FREQ]
         if value != '':
