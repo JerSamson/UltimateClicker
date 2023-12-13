@@ -1,6 +1,5 @@
 from queue import *
-import numpy as np
-
+from logger import Logger
 from screenrecorder import ScreenRecorder
 
 class UnitQueue(Queue):
@@ -19,6 +18,7 @@ class UnitQueue(Queue):
 
 class ClickQueue(PriorityQueue):
     def __init__(self, maxsize: int = 0) -> None:
+        self.logger = Logger()
         super().__init__(maxsize)
         
     def get_current_queue(self):
@@ -64,9 +64,9 @@ class ClickQueue(PriorityQueue):
                     if set2 is not None and t[1] in set2:
                         idx = set2.index(t[1])
                         set2[idx] = t[1]
-                        print(f'INFO - ClickerQueue.clean_queue() - Updated ID[{t[1].targetid}] from provided queue')
+                        self.logger.info(f'ClickerQueue.clean_queue() - Updated ID[{t[1].targetid}] from provided queue')
 
-                    print(f'INFO - ClickerQueue.clean_queue() - Removed ID[{t[1].targetid}] from queue')
+                    self.logger.info(f'ClickerQueue.clean_queue() - Removed ID[{t[1].targetid}] from queue')
                     self.queue.remove(t)
 
             return set2
@@ -74,9 +74,9 @@ class ClickQueue(PriorityQueue):
     def add_if_unique(self, tar):
             if not self.is_in_queue(tar):
                 self.put_nowait(tar)
-                print(f'INFO - ClickerQueue.add_if_unique() - Added ID[{tar[1].targetid}] to queue')
+                self.logger.info(f'ClickerQueue.add_if_unique() - Added ID[{tar[1].targetid}] to queue')
                 return True
-            # print(f'WARN - ClickerQueue.add_if_unique() - ID[{tar[1].targetid}] was already in queue')
+            self.logger.warn(f'ClickerQueue.add_if_unique() - ID[{tar[1].targetid}] was already in queue')
             return False
 
     def first_id(self):

@@ -1,4 +1,3 @@
-from ctypes import Array
 from enum import IntEnum
 import math
 import time
@@ -6,13 +5,16 @@ import PySimpleGUI as sg
 from singleton import Singleton
 from Settings import Settings
 from numba import jit
+from logger import Logger
 
 event_colors = {
     'cps'           :   'red',
     'update_thread' :   'blue',
     'GoldenCookie'  :   'gold',
     'HandleOne'     :   'green',
-    'SecondMarker'  :   'gray90'
+    'SecondMarker'  :   'gray90',
+    'autosave'      :   'SkyBlue1',
+    '5SecondMarker' :   'black'
 }
 
 class EntryType(IntEnum):
@@ -40,16 +42,18 @@ class EventGraph(metaclass=Singleton):
     def __init__(self, key='-EVENTGRAPH-') -> None:
 
         self.settings = Settings()
+        self.logger = Logger()
 
         self.canvas_size=(500,100)
 
         self.bottom_left    = (0,0)
-        self.top_right      = (60, 1000)
+        self.top_right      = (100, 1000)
 
-        self.max_entry_display = 60
+        self.max_entry_display = 100
 
         self.event_entries = []
         self.cps_entries = []
+        # self.n_sec_entry = 0
 
         self.graph = sg.Graph(canvas_size=self.canvas_size,
             graph_bottom_left=self.bottom_left,
@@ -126,7 +130,8 @@ class EventGraph(metaclass=Singleton):
                 min_event_timestamp = time.time()
 
             entry.normalized_timestamp = int(round((entry.timestamp - min_event_timestamp), 3)*1000)
-            print(f'INFO - event_graph.normalize_timestamp - EventEntry [{entry.name}] normalized to {entry.normalized_timestamp}')
+
+            self.logger.debug(f'event_graph.normalize_timestamp - EventEntry [{entry.name}] normalized to {entry.normalized_timestamp}')            
     
 
     def adapt_graph_size(self):
@@ -167,7 +172,7 @@ class EventGraph(metaclass=Singleton):
             self.graph.BottomLeft = self.bottom_left
             self.graph.TopRight = self.top_right
 
-        # print(f'INFO - event_graph.adapt_graph_size() - Graph size: x:[{self.graph.BottomLeft[0]}, {self.graph.TopRight[0]}] y:[{self.graph.BottomLeft[1]}, {self.graph.TopRight[1]}]')
+        self.logger.debug(f'event_graph.adapt_graph_size() - Graph size: x:[{self.graph.BottomLeft[0]}, {self.graph.TopRight[0]}] y:[{self.graph.BottomLeft[1]}, {self.graph.TopRight[1]}]')            
 
 
     def draw_cps(self):
@@ -192,20 +197,32 @@ class EventGraph(metaclass=Singleton):
             # self.graph.draw_lines([(entry.normalized_timestamp, self.graph.BottomLeft[1])])
 
             if entry.normalized_timestamp > self.bottom_left[0] and entry.normalized_timestamp < self.top_right[0]:
-                # print(f'INFO - event_graph.draw_event() - Drawing {entry.name} event at normalized ts {entry.normalized_timestamp}')
-                self.graph.draw_line((entry.normalized_timestamp, self.graph.BottomLeft[1]), (entry.normalized_timestamp, self.graph.TopRight[1]), color=color, width=2)
-            elif entry.normalized_timestamp < self.bottom_left[0]:
+                self.logger.debug(f'event_graph.draw_event() - Drawing {entry.name} event at normalized ts {entry.normalized_timestamp}')
+                if entry.name == '5SecondMarker':
+                    ratio = 0.1
+                    self.graph.draw_line((entry.normalized_timestamp, self.graph.BottomLeft[1]), (entry.normalized_timestamp, (self.graph.TopRight[1]-self.graph.BottomLeft[1])*ratio), color=color, width=4)
+                    self.graph.draw_line((entry.normalized_timestamp, self.graph.TopRight[1]), (entry.normalized_timestamp, self.graph.TopRight[1]*(1-ratio)), color=color, width=4)
+                    # self.event_entries.remove(entry)
+                else:
+                    self.graph.draw_line((entry.normalized_timestamp, self.graph.BottomLeft[1]), (entry.normalized_timestamp, self.graph.TopRight[1]), color=color, width=2)
+
+            elif entry.normalized_timestamp < self.bottom_left[0] or entry.name == 'SecondMarker':
                 self.event_entries.remove(entry)
 
     def draw_seconds(self):
+        # TODO: Optimize that
         min = int(math.floor(self.min_cps_entry_timestamp()))
         max = int(math.ceil(self.max_cps_entry_timestamp()))
         ts_range = max - min 
 
-        # print(f'INFO - event_graph.draw_seconds() - range={ts_range}')
+        self.logger.debug(f'event_graph.draw_seconds() - range={ts_range}')
 
         for i in range(ts_range):
-            self.add_event_entry(EventEntry(min+i, 'SecondMarker'))
+            sec_entry = EventEntry(min+i, 'SecondMarker')
+            # if sec_entry not in self.event_entries:
+            #     if self.n_sec_entry / 5 == 1:
+            #         self.add_event_entry(EventEntry(min+i, '5SecondMarker'))
+            self.add_event_entry(sec_entry)
 
     def seconds_to_days_etc(self, seconds):
         minutes, seconds = divmod(seconds, 60)
@@ -214,8 +231,6 @@ class EventGraph(metaclass=Singleton):
         return f'{int(days)}d{int(hours)}h{int(minutes)}m{int(seconds)}s'
 
     def draw_runtime(self):
-        offset_x=550
-        offset_y=10
         text = self.seconds_to_days_etc(self.settings.run_time)
         self.graph.DrawText(text, location=(0,0), text_location=sg.TEXT_LOCATION_BOTTOM_LEFT, font=('Terminal'))
 

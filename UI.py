@@ -4,6 +4,7 @@ from DetectionMode import detectionMode
 from pynput.mouse import Listener
 from ClickHandler import ClickHandler
 from Target import *
+from logger import Logger
 import cursor
 import csv
 import os 
@@ -21,85 +22,98 @@ def millify(n):
         return '{:.3f}{}'.format(n / 10**(3 * millidx), f'\n{millnames[millidx]} Clicks')
     else:
         return f'{int(n)}\nClicks'
-    
-SET_TARGET_BTN      = '-SET TARGETS-'
-MODE_SAME_BTN       = '-SAME-'
-MODE_DIFF_BTN       = '-DIFF-'
-MODE_CHANGE_BTN     = '-CHANGE-'
-COLOR_BTN           = '-COLOT-'
-CLICK_BTN           ='-CLICK-'
-FAST_TRACK_BTN      ='-FASTTRACK-'
-CUR_IMAGE_KEY       ='-CURIMAGE-'
-OG_IMAGE_KEY        ='-OGIMAGE-'
-LAST_IMAGE_KEY      ='-LASTIMAGE-'
-NEXT_IMAGE_KEY      ='-NEXTIMAGE-'
-EVENT_GRAPH         ='-EVENTGRAPH-'
-TARGET_VSEP         ='-TARVSEP-'
-SELECTED_FRAME      ='-SELTARFRAME-'
-NEXT_FRAME          ='-NEXTTARFRAME-'
-LAST_FRAME          ='-LASTTARFRAME-'
-TARGET_TABLE        = '-TARGETS-'
-DETAIL_ID           = '-DETAILID-'
-BIG_CPS             = '-BIGCPS-'
-BIG_TOTAL           = '-BIGTOT-'
-BIG_GOLD            = '-BIGGOLD-'
-TIMES_CLICKED       = '-NBCLICKS-'
-SAVE_BTN            = '-SAVE-'
-LOAD_BTN            = '-LOAD-'
-LOAD_LAST_BTN       = '-LOADLAST-'
-CLEAR_BTN           = '-CLEAR-'
-BOTTOM_ROW_FRAME    = '-BOTTOM_ROW_FRAME-'
-ENABLED_COLOR       = ('black', 'green')
-DISABLED_COLOR      = ('black', 'red')
-PATIENCE_SLIDER     = '-PATIENCE_SLIDER-'
-PATIENCE_PROGRESS   = '-PATIENCE_BIGINC-'
-PATIENCE_PROGRESS_2 = '-PATIENCE_SMALLINC-'
-NEXT_TARGET         = '-NEXT-'
-TOGGLE_TRACK        = '-TOGGLETRACK-'
-TOGGLE_TABLE        = '-TOGGLETABLE-'
-COLOR_PREVIEW_SIZE  = (10,2)
-
-TRACK_TAB        = '-TRACK_TAB-'
-
-#SETTINGS
-SETTINGS_TAB        = '-SETTINGS_TAB-'
-
-PATIENCE_FRAME = '-PATIENCEFRAME-'
-CPS_FRAME = '-CPSFRAME-'
-TRACKER_FRAME = '-TRACKERFRAME-'
-GENERAL_FRAME = '-GENERALFRAME-'
-COOKIE_FRAME = '-COOKIEFRAME-'
-
-SUBMIT_SETTINGS     = '-SUBMITSETTINGS'
-SAVE_FOLDER         = '-SAVEDIR-'
-SAVE_FOLDER_CUR     = '-SAVEDIRCUR-'
-
-TARGET_ZONE         = '-TARGETZONE-'
-TARGET_ZONE_CUR     = '-TARGETZONECUR-'
-
-UI_UPDATE           = '-UIUPDATE-'
-UI_UPDATE_CUR       = '-UIUPDATECUR-'
+         
+SET_TARGET_BTN           = '-SET TARGETS-'
+MODE_SAME_BTN            = '-SAME-'
+MODE_DIFF_BTN            = '-DIFF-'
+MODE_CHANGE_BTN          = '-CHANGE-'
+MODE_IDLE_BTN            = '-IDLE-'
+COLOR_BTN                = '-COLOT-'
+CLICK_BTN                = '-CLICK-'
+FAST_TRACK_BTN           = '-FASTTRACK-'
+IDLE_MODE_BTN            = '-IDLEMODEBTN-'
+CUR_IMAGE_KEY            = '-CURIMAGE-'
+OG_IMAGE_KEY             = '-OGIMAGE-'
+LAST_IMAGE_KEY           = '-LASTIMAGE-'
+NEXT_IMAGE_KEY           = '-NEXTIMAGE-'
+EVENT_GRAPH              = '-EVENTGRAPH-'
+TARGET_VSEP              = '-TARVSEP-'
+SELECTED_FRAME           = '-SELTARFRAME-'
+NEXT_FRAME               = '-NEXTTARFRAME-'
+LAST_FRAME               = '-LASTTARFRAME-'
+TARGET_TABLE             = '-TARGETS-'
+DETAIL_ID                = '-DETAILID-'
+BIG_CPS                  = '-BIGCPS-'
+BIG_TOTAL                = '-BIGTOT-'
+BIG_GOLD                 = '-BIGGOLD-'
+TIMES_CLICKED            = '-NBCLICKS-'
+SAVE_BTN                 = '-SAVE-'
+LOAD_BTN                 = '-LOAD-'
+LOAD_LAST_BTN            = '-LOADLAST-'
+CLEAR_BTN                = '-CLEAR-'
+BOTTOM_ROW_FRAME         = '-BOTTOM_ROW_FRAME-'
+ENABLED_COLOR            = ('black', 'green')
+DISABLED_COLOR           = ('black', 'red')
+PATIENCE_SLIDER          = '-PATIENCE_SLIDER-'
+PATIENCE_PROGRESS        = '-PATIENCE_BIGINC-'
+PATIENCE_PROGRESS_2      = '-PATIENCE_SMALLINC-'
+NEXT_TARGET              = '-NEXT-'
+TOGGLE_TRACK             = '-TOGGLETRACK-'
+TOGGLE_TABLE             = '-TOGGLETABLE-'
+COLOR_PREVIEW_SIZE       = (10,2)
+     
+TRACK_TAB                = '-TRACK_TAB-'
+     
+#SETTINGS    
+SETTINGS_TAB             = '-SETTINGS_TAB-'
+     
+PATIENCE_FRAME           = '-PATIENCEFRAME-'
+CPS_FRAME                = '-CPSFRAME-'
+TRACKER_FRAME            = '-TRACKERFRAME-'
+GENERAL_FRAME            = '-GENERALFRAME-'
+COOKIE_FRAME             = '-COOKIEFRAME-'
+PID_FRAME                = '-PID_FRAME-'
+     
+SUBMIT_SETTINGS          = '-SUBMITSETTINGS'
+SAVE_FOLDER              = '-SAVEDIR-'
+SAVE_FOLDER_CUR          = '-SAVEDIRCUR-'
+     
+TARGET_ZONE              = '-TARGETZONE-'
+TARGET_ZONE_CUR          = '-TARGETZONECUR-'
+     
+UI_UPDATE                = '-UIUPDATE-'
+UI_UPDATE_CUR            = '-UIUPDATECUR-'
 
 TRIGGER_CHECK_RATE       = '-TRIGGERCHECK-'
 TRIGGER_CHECK_RATE_CUR   = '-TRIGGERCHECKCUR-'
 
-GOLD_DIGGER          = '-GOLDDIG'
-GOLD_DIGGER_CUR      = '-GOLDDIGCUR'
+GOLD_DIGGER              = '-GOLDDIG'
+GOLD_DIGGER_CUR          = '-GOLDDIGCUR'
 
-GOLD_FREQ                 = '-GOLDFREQ-'
-GOLD_FREQ_CUR             = '-GOLDFREQCUR-'
+GOLD_FREQ                = '-GOLDFREQ-'
+GOLD_FREQ_CUR            = '-GOLDFREQCUR-'
 
-MAX_PATIENCE      = '-MAXPATIENCE-'
-MAX_PATIENCE_CUR  = '-MAXPATIENCECUR-'
+MAX_PATIENCE             = '-MAXPATIENCE-'
+MAX_PATIENCE_CUR         = '-MAXPATIENCECUR-'
 
-MAX_PATIENCE_STACK      = '-MAXPATIENCESTACK-'
-MAX_PATIENCE_STACK_CUR  = '-MAXPATIENCESTACKCUR-'
+MAX_PATIENCE_STACK       = '-MAXPATIENCESTACK-'
+MAX_PATIENCE_STACK_CUR   = '-MAXPATIENCESTACKCUR-'
 
-TARGET_CPS                 = '-TARGETCPS-'
-TARGET_CPS_CUR             = '-TARGETCPSCUR-'
+TARGET_CPS               = '-TARGETCPS-'
+TARGET_CPS_CUR           = '-TARGETCPSCUR-'
 
-CPS_UPDATE                 = '-CPSUPDATE-'
-CPS_UPDATE_CUR             = '-CPSUPDATECUR-'
+CPS_UPDATE               = '-CPSUPDATE-'
+CPS_UPDATE_CUR           = '-CPSUPDATECUR-'
+
+AUTOSAVE_FREQ            = '-AUTOSAVE_FREQ-'
+AUTOSAVE_FREQ_CUR        = '-AUTOSAVE_FREQCUR-'
+
+KP                       = '-KP-'
+KI                       = '-KI-'
+KD                       = '-KD-'
+KP_CUR                   = '-KPCUR-'
+KI_CUR                   = '-KICUR-'
+KD_CUR                   = '-KDCUR-'
 
 def rgb_to_hex(r, g, b):
     return '#{:02x}{:02x}{:02x}'.format(r, g, b)
@@ -113,6 +127,7 @@ class App:
         self.settings = Settings()
         self.eventgraph = EventGraph(EVENT_GRAPH)  
         self.cam = ScreenRecorder()
+        self.logger = Logger()
 
         self.last_saved = None
         self.click_listener_thread = None
@@ -133,7 +148,6 @@ class App:
         self.queue = ClickHandler()
         self.tab_size_x = 50
         self.tab_size_y = 1
-        self.autosave_freq = 5 # min
         self.last_autosave = time.time()
         self.cur_x = 0
         self.cur_y = 0
@@ -169,6 +183,7 @@ class App:
         general_settings = [
             [sg.Text('Saves Dir', size=(text_width,1), tooltip='Directory to load and save data'), sg.InputText(key=SAVE_FOLDER, size=(15,1)), sg.Text(key=SAVE_FOLDER_CUR, text=self.settings.save_dir, text_color='light gray', auto_size_text=True)], 
             [sg.Text('UI refresh (ms)', size=(text_width,1), tooltip='Delay (ms) between UI refresh while running.\nLow values can affect performances'), sg.InputText(key=UI_UPDATE, size=(15,1)), sg.Text(key=UI_UPDATE_CUR, text=self.settings.ui_update, text_color='light gray', auto_size_text=True)], 
+            [sg.Text('Autosave (s)', size=(text_width,1), tooltip='Delay (s) between Autosaves (0 for no autosave)'), sg.InputText(key=AUTOSAVE_FREQ, size=(15,1)), sg.Text(key=AUTOSAVE_FREQ_CUR, text=self.settings.autosave_freq, text_color='light gray', auto_size_text=True)], 
         ]
         self.general_settings_frame = [sg.Image(size=(0, 0))] + [sg.Frame('General', general_settings, key=GENERAL_FRAME, visible=False, expand_x=True, title_color=setting_frame_title_color)]
 
@@ -178,12 +193,20 @@ class App:
         ]
         self.cookie_settings_frame = [sg.Image(size=(0, 0))] + [sg.Frame('Cookie Clicker', cookie_settings, key=COOKIE_FRAME , visible=False, expand_x=True, title_color=setting_frame_title_color)]
 
+        pid_settings = [
+            [sg.Text('KP', size=(text_width,1), tooltip='PID P param'), sg.InputText(key=KP, size=(15,1)), sg.Text(key=KP_CUR, text=self.settings.p, text_color='light gray', auto_size_text=True)], 
+            [sg.Text('KI', size=(text_width,1), tooltip='PID I param'), sg.InputText(key=KI, size=(15,1)), sg.Text(key=KI_CUR, text=self.settings.i, text_color='light gray', auto_size_text=True)], 
+            [sg.Text('KD', size=(text_width,1), tooltip='PID D param'), sg.InputText(key=KD, size=(15,1)), sg.Text(key=KD_CUR, text=self.settings.d, text_color='light gray', auto_size_text=True)], 
+        ]
+        pid_settings_frame = [sg.Image(size=(0, 0))] + [sg.Frame('PID', pid_settings, key=PID_FRAME, visible=False, expand_x=True, title_color=setting_frame_title_color)]
+
 
         settings_tab= [
             self.general_settings_frame,
             self.tracker_settings_frame,
             self.patience_settings_frame,
             self.cps_settings_frame,
+            pid_settings_frame,
             self.cookie_settings_frame,
             [sg.Button(button_text='Update', key=SUBMIT_SETTINGS), sg.Sizer(0,0)],
             ]
@@ -225,6 +248,7 @@ class App:
             sg.Button('diff', key=MODE_DIFF_BTN, button_color = DISABLED_COLOR, visible=False, expand_x=True, expand_y=True),
             sg.Button('change', key=MODE_CHANGE_BTN, button_color = DISABLED_COLOR, visible=False, expand_x=True, expand_y=True),
             sg.Button('fastClick', key=FAST_TRACK_BTN, button_color = DISABLED_COLOR, visible=False, expand_x=True, expand_y=True),
+            sg.Button('Idle', key=IDLE_MODE_BTN, button_color = DISABLED_COLOR, visible=False, expand_x=True, expand_y=True),
             sg.Sizer(0, 0)
             ]
 
@@ -326,16 +350,18 @@ class App:
                 self.draw_current()
                 time.sleep(0.5)
             except Exception as e:
-                print(f'display current failed: {e}')
+                self.logger.error(f'UI.diplay_current() - display current failed: {e}')            
                 self.graph_cur.erase()
                 break
 
     def get_middle_of_main_window(self):
-        location = self.window.CurrentLocation()
-        size = self.window.size
-        pLocation = (int(location[0] + size[0]/2), int(location[1] + size[1]/2))
-        return pLocation
-    
+        try:
+            location = self.window.CurrentLocation()
+            size = self.window.size
+            pLocation = (int(location[0] + size[0]/2), int(location[1] + size[1]/2))
+            return pLocation
+        except Exception as e:
+            self.logger.error(f'UI.get_middle_of_main_window() - Failed: {e}')
     def information_popup(self, txt, duration=1, background='white'):
 
         sg.PopupAutoClose(txt, auto_close_duration=duration, location=self.get_middle_of_main_window(), keep_on_top=True, non_blocking=True, background_color=background)
@@ -384,8 +410,8 @@ class App:
 
         window.close()
 
-        print('[Choose_file_popup] event:', event)
-        print('[Choose_file_popup] values:', values)
+        self.logger.debug(f'[Choose_file_popup] event:, {event}')            
+        self.logger.debug(f'[Choose_file_popup] values: {values}')            
 
         if can_create and values and values['-NEWFILE-']:
             return values['-NEWFILE-']
@@ -403,14 +429,15 @@ class App:
         return self.Choose_file_popup(text="Choose file to save", data=files, can_create=True)
 
     def load_targets(self, save_file):
-        print(f'INFO - load_targets - Loading targets from {save_file}')
+        self.logger.info(f'load_targets - Loading targets from {save_file}')            
         try:
-            save_has_gold = False
             self.queue.clear_targets()
             file_path = self.cwd + self.settings.save_dir + save_file
             screenshot = self.cam.get_screen(caller='UI.LoadTargets()')
             with open(file_path, 'r') as file:
                 csvreader = csv.reader(file)
+                
+                save_has_gold = False
 
                 Thread(target=self.track_ready, name='TrackReady').start()
                 for row in csvreader:
@@ -441,10 +468,10 @@ class App:
                 self.settings.current_save = save_file
 
         except Exception as e:
-            print(f'Could not load targets from "{save_file}" ({e})')
+            self.logger.error(f'load_targets - Could not load targets from "{save_file}" ({e})')            
 
     def update_last_save(self, last_save):
-        print(f'INFO - UI.update_last_save() - Updating last save to {last_save}')
+        self.logger.info(f'UI.update_last_save() - Updating last save to {last_save}')            
         with open(self.cwd+self.last_save_file, 'w', newline='') as file:
             writer = csv.writer(file)
             writer.writerow(['last_save', last_save])
@@ -463,7 +490,7 @@ class App:
         if len(self.targets) == 0:
             return
         try:
-            print(f'INFO - save_targets - Saving targets to {save_file}')
+            self.logger.info(f'save_targets - Saving targets to {save_file}')            
             file_path = self.cwd + self.settings.save_dir + save_file
             with open(file_path, 'w', newline='') as file:
                 writer = csv.writer(file)
@@ -474,10 +501,10 @@ class App:
                 writer.writerow(['TIME', int(self.settings.run_time)])
                 
             self.update_last_save(save_file)
-            print(f'INFO - save_targets - Targets saved successfuly to {save_file}')
+            self.logger.info(f'save_targets - Targets saved successfuly to {save_file}')            
             self.information_popup('Save success', background='green')
         except Exception as e:
-            print(f'Could not save files to "{save_file}" ({e})')
+            self.logger.error(f'save_targets - Could not save files to "{save_file}" ({e})')            
             self.information_popup("Save Failed", background='red')
 
     def draw(self, tar=None, graph = None):
@@ -529,13 +556,18 @@ class App:
 
     def update_tabs(self):
         settings_visible = self.current_tab == SETTINGS_TAB
-        print(f'INFO - UI.update_tabs() - Settings tabs are now {"visible" if settings_visible else "hidden"}')
+        self.logger.info(f'UI.update_tabs() - Settings tabs are now {"visible" if settings_visible else "hidden"}')            
         self.window[PATIENCE_FRAME].update(visible=settings_visible)
         self.window[CPS_FRAME].update(visible=settings_visible)
         self.window[TRACKER_FRAME].update(visible=settings_visible)
         self.window[GENERAL_FRAME].update(visible=settings_visible)
         self.window[COOKIE_FRAME].update(visible=settings_visible)
         self.window[SUBMIT_SETTINGS].update(visible=settings_visible)
+        self.window[PID_FRAME].update(visible=settings_visible)
+
+        track_visible = self.current_tab == TRACK_TAB
+        self.window[TARGET_TABLE].update(visible=track_visible)
+
 
     def update_buttons(self):
         try:
@@ -543,12 +575,15 @@ class App:
             self.window[MODE_DIFF_BTN].update(button_color = ENABLED_COLOR if self.mode == detectionMode.different else DISABLED_COLOR)
             self.window[MODE_CHANGE_BTN].update(button_color = ENABLED_COLOR if self.mode == detectionMode.change else DISABLED_COLOR)
             self.window[FAST_TRACK_BTN].update(button_color = ENABLED_COLOR if self.mode == detectionMode.fast else DISABLED_COLOR)
+            self.window[IDLE_MODE_BTN].update(button_color = ENABLED_COLOR if self.mode == detectionMode.idle else DISABLED_COLOR)
 
             self.window[SET_TARGET_BTN].update(visible=not self.running)
             self.window[MODE_SAME_BTN].update(visible=self.setting_targets)
             self.window[MODE_DIFF_BTN].update(visible=self.setting_targets)
             self.window[MODE_CHANGE_BTN].update(visible=self.setting_targets)
             self.window[FAST_TRACK_BTN].update(visible=self.setting_targets)
+            self.window[IDLE_MODE_BTN].update(visible=self.setting_targets)
+            
             # self.window[COLOR_BTN].update(visible=self.setting_targets and self.mode in [detectionMode.same, detectionMode.different, detectionMode.change])
 
             self.window[PATIENCE_SLIDER].update(visible= not self.running)
@@ -565,7 +600,7 @@ class App:
             Thread(target=self.update_cursor, name='UpdateCursor').start()
 
         except RuntimeError as e:
-            print(f'ERROR - Could not run update button ({e})')
+            self.logger.error(f'UI.update_buttons() - Could not run update button ({e})')            
 
     def update_cursor(self):
         if self.setting_targets:
@@ -651,16 +686,6 @@ class App:
     def on_move(self, x, y):
         if self.setting_targets:
             pass
-            # try:
-                # self.cur_x = x
-                # self.cur_y = y
-                # r,g,b = getpixelcolor.average(x, y, self.settings.target_zone, self.settings.target_zone)
-                # hex = rgb_to_hex(r,b,g)
-                # _hex = text_color_for_bg(r,g,b)
-                # self.window[COLOR_BTN].update(text=str((x, y)))
-                # self.window[COLOR_BTN].update(button_color = (_hex, hex), text=str((x, y)))
-            # except Exception as e:
-                # self.window[COLOR_BTN].update(button_color = 'red', text='error')
         elif self.running and (x,y) not in self.queue.get_allowed_positions():
             self.aborted = True
             # self.window.bring_to_front()
@@ -671,7 +696,7 @@ class App:
     def on_click(self, x, y, button, pressed):
         if self.setting_targets and pressed:
             if self.is_click_inside_app(x, y):
-                print('INFO - Click in app')
+                self.logger.debug('Click in app')            
                 return
             if self.mode == detectionMode.same:
                 tar = TrackerTarget(x, y, self.settings.target_zone, detectionMode.same)
@@ -683,6 +708,8 @@ class App:
                 if self.queue.has_fast_target():
                     self.remove_target(self.queue.fast_target)
                 tar = FastTarget(x, y, 0)
+            elif self.mode == detectionMode.idle:
+                tar = IdleTarget(x, y, 60)
             else:
                 return
             self.add_target(tar, not tar.is_ready())
@@ -697,7 +724,7 @@ class App:
 # =-=-=-=-==-=-=-=-==-=-=-=-=
 
     def track_ready(self):
-        print('INFO - UI.track_ready() thread started')
+        self.logger.info('UI.track_ready() thread started')            
         nb_ready = 0
         n=0
         self.all_targets_ready = False
@@ -711,14 +738,14 @@ class App:
                 n = self.nb_target_ready()
                 if nb_ready is not n:
                     nb_ready = n
-                    print(f'Waiting for targets ready ({n}/{len(self.targets)})')
+                    self.logger.info(f'UI.track_ready() - Waiting for targets ready ({n}/{len(self.targets)})')            
             except Exception as e:
-                print(f'are_targets_ready failed ({e})')
+                self.logger.error(f'UI.track_ready() - failed ({e})')            
                 break
 
         self.all_targets_ready = True
         self.queue.has_update = True
-        print('INFO - UI.track_ready() thread finished')
+        self.logger.info('UI.track_ready() thread finished')            
 
         # self.window[CLICK_BTN].update(text='Click!')
 
@@ -745,7 +772,7 @@ class App:
 
 
     def run_queue(self):
-        print('INFO - UI.run_queue() thread started')
+        self.logger.info('UI.run_queue() thread started')            
         self.setting_targets = False
         self.running = True
         self.aborted = False
@@ -767,11 +794,12 @@ class App:
         self.autosave()
         self.update_graphs()
         self.update_buttons()
-        print('INFO - UI.run_queue() thread finished')
+
+        self.logger.info('UI.run_queue() thread finished')            
 
     def add_target(self, tar, track=True):
         if tar in self.queue.targets:
-            print(f'WARN - UI.add_target() - Target already in queue')
+            self.logger.warn('UI.add_target() - Target already in queue')            
             return
         
         self.queue.add_target(tar)
@@ -794,7 +822,7 @@ class App:
                 self.settings.target_zone = int(value)
                 self.window[TARGET_ZONE_CUR].update(value=self.settings.target_zone)
             else:
-                print(f'WARN - invalid target zone value ({value})')
+                self.logger.warn(f'UI.update_settings - invalid target zone value ({value})')            
 
         value = values[UI_UPDATE]
         if value != '':
@@ -802,7 +830,7 @@ class App:
                 self.settings.ui_update = int(value)
                 self.window[UI_UPDATE_CUR].update(value=self.settings.ui_update)
             else:
-                print(f'WARN - invalid UI update rate value ({value})')
+                self.logger.warn(f'UI.update_settings - invalid UI update rate value ({value})')
 
         value = values[TRIGGER_CHECK_RATE]
         if value != '':
@@ -810,7 +838,7 @@ class App:
                 self.settings.trigger_check_rate = int(value)
                 self.window[TRIGGER_CHECK_RATE_CUR].update(value=self.settings.trigger_check_rate)
             else:
-                print(f'WARN - invalid trigger check rate value ({value})')
+                self.logger.warn(f'UI.update_settings - invalid trigger check rate value ({value})')
 
         value = values[GOLD_DIGGER]
         if value != '':
@@ -818,7 +846,7 @@ class App:
                 self.settings.check_for_gold_cookie = value
                 self.window[GOLD_DIGGER_CUR].update(value=f'{"CLICKING GOLD!!!" if self.settings.check_for_gold_cookie else "Nope.. T_T"}')
             else:
-                print(f'WARN - invalid GOLD_DIGGER value ({value})')
+                self.logger.warn(f'UI.update_settings - invalid GOLD_DIGGER value ({value})')
 
         value = values[GOLD_FREQ]
         if value != '':
@@ -826,7 +854,7 @@ class App:
                 self.settings.check_for_gold_freq = int(value)
                 self.window[GOLD_FREQ_CUR].update(value=self.settings.check_for_gold_freq)
             else:
-                print(f'WARN - invalid gold seek freq value ({value})')
+                self.logger.warn(f'UI.update_settings - invalid gold seek freq value ({value})')
 
         value = values[MAX_PATIENCE]
         if value != '':
@@ -835,7 +863,7 @@ class App:
                 self.window[MAX_PATIENCE_CUR].update(value=self.settings.max_patience)
                 self.window[PATIENCE_SLIDER].update(range=(0, self.settings.max_patience))
             else:
-                print(f'WARN - invalid max patience value ({value})')
+                self.logger.warn(f'UI.update_settings - invalid max patience value ({value})')
 
         value = values[MAX_PATIENCE_STACK]
         if value != '':
@@ -844,7 +872,7 @@ class App:
                 self.window[MAX_PATIENCE_STACK_CUR].update(value=self.settings.max_patience_stack)
                 self.window[PATIENCE_PROGRESS].update(max=self.settings.max_patience_stack)
             else:
-                print(f'WARN - invalid max patience value ({value})')
+                self.logger.warn(f'UI.update_settings - invalid max patience value ({value})')
 
         value = values[TARGET_CPS]
         if value != '':
@@ -852,20 +880,49 @@ class App:
                 self.settings.target_cps = int(value)
                 self.window[TARGET_CPS_CUR].update(value=self.settings.target_cps)
             else:
-                print(f'WARN - invalid Target cps value ({value})')
+                self.logger.warn(f'UI.update_settings - invalid Target cps value ({value})')
 
         value = values[CPS_UPDATE]
         if value != '':
             if value.replace('.','',1).isdigit() and float(value) >= 0:
                 self.settings.cps_update_delay = float(value)
-                self.eventgraph.target_cps = float(value)
                 self.window[CPS_UPDATE_CUR].update(value=self.settings.cps_update_delay)
             else:
-                print(f'WARN - invalid cps update value ({value})')
+                self.logger.warn(f'UI.update_settings - invalid cps update value ({value})')
+
+        value = values[AUTOSAVE_FREQ]
+        if value != '':
+            if value.isdigit() and int(value) >= 0:
+                self.settings.autosave_freq = int(value)
+                self.window[AUTOSAVE_FREQ_CUR].update(value=self.settings.autosave_freq)
+            else:
+                self.logger.warn(f'UI.update_settings - invalid autosave_freq value ({value})')
+
+        value = values[KP]
+        if value != '':
+            if value.replace('.','',1).replace('-','',1).isdigit():
+                self.settings.p = float(value)
+                self.window[KP_CUR].update(value=self.settings.p)
+            else:
+                self.logger.warn(f'UI.update_settings - invalid KP value ({value})')
+        value = values[KI]
+        if value != '':
+            if value.replace('.','',1).replace('-','',1).isdigit():
+                self.settings.i = float(value)
+                self.window[KI_CUR].update(value=self.settings.i)
+            else:
+                self.logger.warn(f'UI.update_settings - invalid KI value ({value})')
+        value = values[KD]
+        if value != '':
+            if value.replace('.','',1).replace('-','',1).isdigit():
+                self.settings.d = float(value)
+                self.window[KD_CUR].update(value=self.settings.d)
+            else:
+                self.logger.warn(f'UI.update_settings - invalid KD value ({value})')
 
     def run(self):
         try:
-            print('INFO - UI.run() Started')
+            self.logger.info('UI.run() Started')
             # Create an event loop
             self.click_listener_thread = Listener(on_move=self.on_move, on_click=self.on_click, on_scroll=self.on_scroll)
             self.click_listener_thread.name='ClickListener'
@@ -876,12 +933,12 @@ class App:
                 timeout = 250 if not self.running else self.settings.ui_update
                 event, values = self.window.read(timeout=timeout, timeout_key='NA')
                 if event != 'NA':
-                    print(f'INFO - UI.run() - Handling event [{event}]')
+                    self.logger.info(f'UI.run() - Handling event [{event}]')
 
-                if values[5] == SETTINGS_TAB and self.current_tab != SETTINGS_TAB:
+                if values is not None and values[6] == SETTINGS_TAB and self.current_tab != SETTINGS_TAB:
                     self.current_tab = SETTINGS_TAB
                     self.update_tabs()
-                if values[5] == TRACK_TAB and self.current_tab != TRACK_TAB:
+                elif values is not None and values[6] == TRACK_TAB and self.current_tab != TRACK_TAB:
                     self.current_tab = TRACK_TAB
                     self.update_tabs()
 
@@ -893,14 +950,14 @@ class App:
                 # if self.running:
                 #     self.eventgraph.add_entry(EventEntry(time.time(), 'UI_update'))
 
-
                 if self.queue.has_update:
                     self.queue.has_update = False
                     self.targets = self.queue.targets
 
                 if self.running:
-                    if self.autosave_freq > 0 and time.time() - self.last_autosave >= self.autosave_freq*60:
-                        print(f'INFO - UI.run() - Automatic save (Set for every {self.autosave_freq} minutes)')
+                    if self.settings.autosave_freq > 0 and time.time() - self.last_autosave >= self.settings.autosave_freq*60:
+                        self.logger.info(f'UI.run() - Automatic save (Set for every {self.settings.autosave_freq} minutes)')
+                        self.eventgraph.add_event_entry(EventEntry(time.time(), 'autosave'))
                         self.autosave()
                     self.settings.run_time += (time.time()-start)
                     
@@ -912,9 +969,11 @@ class App:
 
                 if event == 'NA':
                     continue
+
                 elif event == PATIENCE_SLIDER:
                     self.queue.patience_level = int(values[PATIENCE_SLIDER])
-                    print(f'Updated patience level ({self.queue.patience_level})')
+                    self.logger.info(f'UI.run() - Updated patience level ({self.queue.patience_level})')
+
                 elif event == SET_TARGET_BTN:
                     self.setting_targets = not self.setting_targets
                     self.update_buttons()
@@ -927,31 +986,40 @@ class App:
 
                 elif event == MODE_CHANGE_BTN:
                     self.set_mode(detectionMode.change)
+
                 elif event == FAST_TRACK_BTN:
                     self.set_mode(detectionMode.fast)
+
+                elif event == IDLE_MODE_BTN:
+                    self.set_mode(detectionMode.idle)
+
                 elif event == SAVE_BTN:
                     file = self.choose_save_file()
                     if file is not None:
                         self.save_targets(file)
+
                 elif event == LOAD_BTN:
                     file = self.choose_load_file()
                     if file is not None:
                         self.load_targets(file)
+
                 elif event == LOAD_LAST_BTN:
                     self.load_targets(self.get_last_saved())
+
                 elif event == CLEAR_BTN:
                     self.queue.clear_targets()
                     self.settings.current_save = None
                     self.selected_target = None
+
                 elif event == CLICK_BTN:
                     if not self.are_targets_ready():
-                        print('WARN - Not all targets ready. Cant run.')
+                        self.logger.warn(f'UI.run() - Not all targets ready. Cant run.')
+                        # print('WARN - Not all targets ready. Cant run.')
                         continue
                     time.sleep(0.5)
                     Thread(target=self.run_queue, daemon=True, name='RunQueue').start()
                     self.window[BOTTOM_ROW_FRAME].update(visible=False)
                     self.window[CLICK_BTN].update(visible=False)
-
 
                 elif TARGET_TABLE in event:
                     try:
@@ -963,21 +1031,25 @@ class App:
                         self.draw_selected()
                     except Exception as e:
                         pass #No Target selected
+
                 elif event == 'Delete':
                     if self.selected_target is not None:
                         self.remove_target(self.selected_target)
                         self.selected_target=None
-                        # self.graph_cur.Erase()
                         self.graph_selected.erase()
                         self.window[DETAIL_ID].update(value='')
+                        
                 elif event == 'Toggle':
                     if self.selected_target is not None:
                         self.selected_target.enabled = not self.selected_target.enabled
+
                 elif event == TOGGLE_TRACK:
                     for t in [tar for tar in self.targets if isinstance(tar, TrackerTarget)]:
                         t.enabled = not t.enabled
+
                 elif event == TOGGLE_TABLE:
                     self.window[TARGET_TABLE].update(visible=not self.target_table.visible)
+
                 elif event == SUBMIT_SETTINGS:
                     self.update_settings(values)
 
@@ -994,8 +1066,8 @@ class App:
             self.window.close()
             raise e
         finally:
-            print('INFO - UI.run() Finished')
 
+            self.logger.info('UI.run() - UI.run() Finished')
         
 if __name__ == '__main__':
     try:

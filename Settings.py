@@ -16,6 +16,13 @@ class Settings(metaclass=Singleton):
         self.max_patience = 20
         self.max_patience_stack = 10
         self.target_cps = 50
-        self.cps_update_delay = 0.1
+        self.cps_update_delay = 0.033
+        self.autosave_freq = 5 # min
+
+        self.p = 0.00003
+        self.i = 0.0050
+        self.d = 0.000000025
 
         self.run_time = 0
+
+        self.log_level = 0
