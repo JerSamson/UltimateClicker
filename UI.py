@@ -822,6 +822,7 @@ class App:
     def remove_target(self, tar):
         self.queue.remove_target(tar)
 
+    # TODO: Could be in settings class
     def update_settings(self, values):
 
         value = values[SAVE_FOLDER]

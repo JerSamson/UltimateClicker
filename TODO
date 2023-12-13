@@ -3,10 +3,21 @@ DONE - Real-Time cps graph
 DONE - Instead of checking individual tracker target zones for triggers, to save computing power: 
             - Take a screenshot of the whole screen / game
             - Check every target using the same picture (Optional arg)
-Done - Runtime counter
-Done - Auto save to specified file instead of default 'auto_save'
+DONE - Runtime counter
+DONE - Auto save to specified file instead of default 'auto_save'
+DONE - UI optimisations
+    - Click buttons shouldnt be visible on settings page
+    - Settings could have collapsable sections
 
-
+DONE - Setting class (xml?)
+        - Default settings
+        - Ability to change default settings
+        - setting_entry subclass
+            Tooltip
+            Type (Bool, Int, Float...)
+            Validation
+            *Same instance could be shared between classes
+            
 Delete save
 
 - Possibility of specifying a specific window for a target? 
@@ -23,15 +34,5 @@ Idle targets implementation
 
 Different priority types
 
-UI optimisations
-    - Click buttons shouldnt be visible on settings page
-    - Settings could have collapsable sections
 
-Setting class (xml?)
-    - Default settings
-    - Ability to change default settings
-    - setting_entry subclass
-        Tooltip
-        Type (Bool, Int, Float...)
-        Validation
-        *Same instance could be shared between classes
+
