@@ -1,5 +1,6 @@
 from enum import IntEnum
 import math
+import statistics
 import time
 import PySimpleGUI as sg
 from singleton import Singleton
@@ -249,8 +250,9 @@ class EventGraph(metaclass=Singleton):
         self.graph.DrawText(text, location=(0,0), text_location=sg.TEXT_LOCATION_BOTTOM_LEFT, font=('Terminal'))
 
     def draw_stats(self):
-        text = f'[{self.min_cps_entry()}, {self.max_cps_entry()}]'
-        self.graph.DrawText(text, location=(0,self.canvas_size[1]), text_location=sg.TEXT_LOCATION_TOP_LEFT, font=('Terminal'), color='gray')
+        cps_vals = [val.cps for val in self.cps_entries]
+        text = f'[{self.min_cps_entry()}, {self.max_cps_entry()}] pstdev:{round(statistics.pstdev(cps_vals, self.settings.get(TARGET_CPS)), 2)}'
+        self.graph.DrawText(text, location=(0,self.top_right[1]-5), text_location=sg.TEXT_LOCATION_TOP_LEFT, font=('Terminal'), color='gray')
 
     @jit(target_backend='cuda', forceobj=True)
     def update(self):
