@@ -5,6 +5,7 @@ import xml.etree.ElementTree as ET
 from bs4 import BeautifulSoup
 import logger
 import os.path
+import math
 
 # SETTINGS    
 SETTINGS_TAB             = '-SETTINGS_TAB-'
@@ -68,7 +69,7 @@ LOG_LEVEL                = '-LOG_LEVEL-'
 LOG_LEVEL_CUR            = '-LOG_LEVEL_CUR-'  
 
 class SettingEntry:
-    def __init__(self, text, input_key, cur_val_key, type, tooltip=None, text_width=20, text_color='light gray') -> None:
+    def __init__(self, text, input_key, cur_val_key, type, tooltip=None, text_width=20, text_color='light gray', min=-math.inf, max=math.inf) -> None:
         self.text = text
         self.input_key = input_key
         self.cur_val_key = cur_val_key
@@ -77,6 +78,8 @@ class SettingEntry:
         self.type = type
         self.tooltip = tooltip
         self.cur_value = None
+        self.min = min
+        self.max = max
         
     def layout(self):
         return [
@@ -119,6 +122,25 @@ class Settings(metaclass=Singleton):
 
     def has_user_settings(self):
         return os.path.isfile(self.userdata_file) 
+
+    def update_settings(self, values):
+        for entry in self.entries:
+            value = values[entry.input_key]
+            if value != '':
+                if entry.type == int:
+                    if value.replace('-','',1).isdigit() and int(value) >= entry.min and int(value) <= entry.max:
+                        self.set(entry.input_key, int(value))
+                    else:
+                        self.logger.warn(f'Settings.update_settings() - invalid value for {entry.input_key} (Should be integer between [{entry.min, entry.max}] but got {value})')            
+
+                elif entry.type == float:
+                    if value.replace('.','',1).replace('-','',1).isdigit() and float(value) >= entry.min and float(value) <= entry.max:
+                        self.set(entry.input_key, float(value))
+                    else:
+                        self.logger.warn(f'Settings.update_settings() - invalid value for {entry.input_key} (Should be float between [{entry.min, entry.max}] but got {value})')            
+
+                elif entry.type == str:
+                    self.set(entry.input_key, str(value))
 
 
     def get(self, key):

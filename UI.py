@@ -119,20 +119,20 @@ class App:
         setting_frame_title_color = 'dark slate gray'
 
         save_dir_setting            = self.settings.add_entry(SettingEntry('Save Directory', SAVE_FOLDER, SAVE_FOLDER_CUR, str, 'Directory to load and save data'))
-        UI_refresh_setting          = self.settings.add_entry(SettingEntry('UI refresh (ms)', UI_UPDATE, UI_UPDATE_CUR, int, 'Delay (ms) between UI refresh while running.\nLow values can affect performances'))
-        autosave_setting            = self.settings.add_entry(SettingEntry('Autosave (s)', AUTOSAVE_FREQ, AUTOSAVE_FREQ_CUR, int, 'Delay (s) between Autosaves (0 for no autosave)'))
-        max_patience_setting        = self.settings.add_entry(SettingEntry('Max patience', MAX_PATIENCE, MAX_PATIENCE_CUR, int, 'When using trackers, patience will prevent the clicker to simply click as soon as its triggered.\nEach newly triggered target add 1 stack. Each stack will take <<patience level>> sec to deplete.'))
-        max_patience_stack_setting  = self.settings.add_entry(SettingEntry('Max patience stack', MAX_PATIENCE_STACK, MAX_PATIENCE_STACK_CUR, int, 'Patience stack that would bring the queued up delay to exceed this value will be ignored.'))
-        target_cps_setting          = self.settings.add_entry(SettingEntry('Target CPS', TARGET_CPS, TARGET_CPS_CUR, int, 'Setpoint for CPS pid of fast trgets.'))
-        cps_update_setting          = self.settings.add_entry(SettingEntry('CPS Update Delay (s)', CPS_UPDATE, CPS_UPDATE_CUR, float, 'Delay between cps update (fast targets).'))
-        trigger_rate_setting        = self.settings.add_entry(SettingEntry('Trigger check rate (s)', TRIGGER_CHECK_RATE, TRIGGER_CHECK_RATE_CUR, int, 'Delay (s) between trigger checks (Same as current patience level [-1] by default)\nLow values can affect performances'))
-        target_zone_setting         = self.settings.add_entry(SettingEntry('Target zone (px)', TARGET_ZONE, TARGET_ZONE_CUR, int, 'Height and width (px) of the area used to check if target has triggered.'))
-        cookie_check_rate_setting   = self.settings.add_entry(SettingEntry('Check freq (s)', GOLD_FREQ, GOLD_FREQ_CUR, int, 'Delay (s) between gold cookie seek'))
+        UI_refresh_setting          = self.settings.add_entry(SettingEntry('UI refresh (ms)', UI_UPDATE, UI_UPDATE_CUR, int, 'Delay (ms) between UI refresh while running.\nLow values can affect performances', min=1))
+        autosave_setting            = self.settings.add_entry(SettingEntry('Autosave (s)', AUTOSAVE_FREQ, AUTOSAVE_FREQ_CUR, int, 'Delay (s) between Autosaves (0 for no autosave)', min=0))
+        max_patience_setting        = self.settings.add_entry(SettingEntry('Max patience', MAX_PATIENCE, MAX_PATIENCE_CUR, int, 'When using trackers, patience will prevent the clicker to simply click as soon as its triggered.\nEach newly triggered target add 1 stack. Each stack will take <<patience level>> sec to deplete.', min=1))
+        max_patience_stack_setting  = self.settings.add_entry(SettingEntry('Max patience stack', MAX_PATIENCE_STACK, MAX_PATIENCE_STACK_CUR, int, 'Patience stack that would bring the queued up delay to exceed this value will be ignored.', min=1))
+        target_cps_setting          = self.settings.add_entry(SettingEntry('Target CPS', TARGET_CPS, TARGET_CPS_CUR, int, 'Setpoint for CPS pid of fast trgets.', min=0))
+        cps_update_setting          = self.settings.add_entry(SettingEntry('CPS Update Delay (s)', CPS_UPDATE, CPS_UPDATE_CUR, float, 'Delay between cps update (fast targets).', min=0))
+        trigger_rate_setting        = self.settings.add_entry(SettingEntry('Trigger check rate (s)', TRIGGER_CHECK_RATE, TRIGGER_CHECK_RATE_CUR, int, 'Delay (s) between trigger checks (Same as current patience level [-1] by default)\nLow values can affect performances', min=1))
+        target_zone_setting         = self.settings.add_entry(SettingEntry('Target zone (px)', TARGET_ZONE, TARGET_ZONE_CUR, int, 'Height and width (px) of the area used to check if target has triggered.', min=2))
+        cookie_check_rate_setting   = self.settings.add_entry(SettingEntry('Check freq (s)', GOLD_FREQ, GOLD_FREQ_CUR, int, 'Delay (s) between gold cookie seek', min=1))
         kp_setting                  = self.settings.add_entry(SettingEntry('KP', KP, KP_CUR, float, 'PID P param'))
         ki_setting                  = self.settings.add_entry(SettingEntry('KI', KI, KI_CUR, float, 'PID I param'))
         kd_setting                  = self.settings.add_entry(SettingEntry('KD', KD, KD_CUR, float, 'PID D param'))
 
-        log_level_setting           = self.settings.add_entry(SettingEntry('Log level', LOG_LEVEL, LOG_LEVEL_CUR, int))
+        log_level_setting           = self.settings.add_entry(SettingEntry('Log level', LOG_LEVEL, LOG_LEVEL_CUR, int, min=0, max=3))
 
 
         self.settings.load()
@@ -357,8 +357,11 @@ class App:
         font = ("Arial", 12)
 
         # Create the window
-        self.window = sg.Window("UltimateClicker", layout, location=(1100,100), font=font, element_justification='center')
+        self.window = sg.Window("UltimateClicker", layout, location=(1100,100), font=font, element_justification='center', finalize=True)
 
+        for setting in self.settings.entries:
+            self.window[setting.input_key].bind("<Return>", "_Enter")
+            
     def toggle_collapsible(self, collapsible:Collapsible, collapse=None):
         if collapse is None:
             collapsible.collapsed = not collapsible.collapsed
@@ -838,42 +841,19 @@ class App:
     def remove_target(self, tar):
         self.queue.remove_target(tar)
 
-    # TODO: Could be in settings class
     def update_settings(self, values):
 
-        value = values[SAVE_FOLDER]
-        if value != '':
-            self.settings.set(SAVE_FOLDER, values[SAVE_FOLDER])
+        self.settings.update_settings(values=values)
+
         self.window[SAVE_FOLDER_CUR].update(value=self.settings.get(SAVE_FOLDER))
         self.window[SAVE_FOLDER].update(value='')
-
-        value = values[TARGET_ZONE]
-        if value != '' :
-            if value.isdigit() and int(value) > 1:
-                self.settings.set(TARGET_ZONE, int(value))
-
-            else:
-                self.logger.warn(f'UI.update_settings - invalid target zone value ({value})')            
+    
         self.window[TARGET_ZONE_CUR].update(value=self.settings.get(TARGET_ZONE))
         self.window[TARGET_ZONE].update(value='')
 
-        value = values[UI_UPDATE]
-        if value != '':
-            if value.isdigit() and int(value) >= 1:
-                self.settings.set(UI_UPDATE, int(value))
-
-            else:
-                self.logger.warn(f'UI.update_settings - invalid UI update rate value ({value})')
         self.window[UI_UPDATE_CUR].update(value=self.settings.get(UI_UPDATE))
         self.window[UI_UPDATE].update(value='')
 
-        value = values[TRIGGER_CHECK_RATE]
-        if value != '':
-            if value.isdigit() and int(value) >= 1:
-                self.settings.set(TRIGGER_CHECK_RATE, int(value))
-
-            else:
-                self.logger.warn(f'UI.update_settings - invalid trigger check rate value ({value})')
         current_value = self.settings.get(TRIGGER_CHECK_RATE)
         display_value = current_value if current_value > 0 else str(current_value) + " (Same as patience)"
         self.window[TRIGGER_CHECK_RATE_CUR].update(value=display_value)
@@ -888,103 +868,37 @@ class App:
                 self.logger.warn(f'UI.update_settings - invalid GOLD_DIGGER value ({value})')
         self.window[GOLD_DIGGER_CUR].update(value=f'{"CLICKING GOLD!!!" if self.settings.check_for_gold_cookie else "Nope.. T_T"}')
 
-        value = values[GOLD_FREQ]
-        if value != '':
-            if value.isdigit() and int(value) >= 1:
-                self.settings.set(GOLD_FREQ, int(value))
 
-            else:
-                self.logger.warn(f'UI.update_settings - invalid gold seek freq value ({value})')
         self.window[GOLD_FREQ_CUR].update(value=self.settings.get(GOLD_FREQ))
         self.window[GOLD_FREQ].update(value='')
 
-        value = values[MAX_PATIENCE]
-        if value != '':
-            if value.isdigit() and int(value) > 0:
-                self.settings.set(MAX_PATIENCE, int(value))
-
-            else:
-                self.logger.warn(f'UI.update_settings - invalid max patience value ({value})')
         self.window[MAX_PATIENCE_CUR].update(value=self.settings.get(MAX_PATIENCE))
         self.window[PATIENCE_SLIDER].update(range=(0, self.settings.get(MAX_PATIENCE)))
         self.window[MAX_PATIENCE].update(value='')
 
-        value = values[MAX_PATIENCE_STACK]
-        if value != '':
-            if value.isdigit() and int(value) > 0:
-                self.settings.set(MAX_PATIENCE_STACK, int(value))
-
-            else:
-                self.logger.warn(f'UI.update_settings - invalid max patience value ({value})')
         self.window[MAX_PATIENCE_STACK_CUR].update(value=self.settings.get(MAX_PATIENCE_STACK))
         self.window[PATIENCE_PROGRESS].update(max=self.settings.get(MAX_PATIENCE_STACK))
         self.window[MAX_PATIENCE_STACK].update(value='')
 
-        value = values[TARGET_CPS]
-        if value != '':
-            if value.isdigit() and int(value) >= 0:
-                self.settings.set(TARGET_CPS, int(value))
-
-            else:
-                self.logger.warn(f'UI.update_settings - invalid Target cps value ({value})')
         self.window[TARGET_CPS_CUR].update(value=self.settings.get(TARGET_CPS))
         self.window[TARGET_CPS].update(value='')
 
-        value = values[CPS_UPDATE]
-        if value != '':
-            if value.replace('.','',1).isdigit() and float(value) >= 0:
-                self.settings.set(CPS_UPDATE, float(value))
-
-            else:
-                self.logger.warn(f'UI.update_settings - invalid cps update value ({value})')
         self.window[CPS_UPDATE_CUR].update(value=self.settings.get(CPS_UPDATE))
         self.window[CPS_UPDATE].update(value='')
 
-        value = values[AUTOSAVE_FREQ]
-        if value != '':
-            if value.isdigit() and int(value) >= 0:
-                self.settings.set(AUTOSAVE_FREQ, int(value))
-
-            else:
-                self.logger.warn(f'UI.update_settings - invalid autosave_freq value ({value})')
         self.window[AUTOSAVE_FREQ_CUR].update(value=self.settings.get(AUTOSAVE_FREQ))
         self.window[AUTOSAVE_FREQ].update(value='')
 
-        value = values[KP]
-        if value != '':
-            if value.replace('.','',1).replace('-','',1).isdigit():
-                self.settings.set(KP, float(value))
-
-            else:
-                self.logger.warn(f'UI.update_settings - invalid KP value ({value})')
         self.window[KP_CUR].update(value=self.settings.get(KP))
         self.window[KP].update(value='')
 
-        value = values[KI]
-        if value != '':
-            if value.replace('.','',1).replace('-','',1).isdigit():
-                self.settings.set(KI, float(value))
-            else:
-                self.logger.warn(f'UI.update_settings - invalid KI value ({value})')
         self.window[KI_CUR].update(value=self.settings.get(KI))
         self.window[KI].update(value='')
-        
-        value = values[KD]
-        if value != '':
-            if value.replace('.','',1).replace('-','',1).isdigit():
-                self.settings.set(KD, float(value))
-            else:
-                self.logger.warn(f'UI.update_settings - invalid KD value ({value})')
+
         self.window[KD_CUR].update(value=self.settings.get(KD))
         self.window[KD].update(value='')
 
-        value = values[LOG_LEVEL]
-        if value != '':
-            if value.isdigit() and int(value) >= 0:
-                self.settings.set(LOG_LEVEL, int(value))
-                self.logger.set_log_level(int(value))
-            else:
-                self.logger.warn(f'UI.update_settings - invalid log level value ({value})')
+
         self.window[LOG_LEVEL_CUR].update(value=self.settings.get(LOG_LEVEL))
         self.window[LOG_LEVEL].update(value='')
 
@@ -1010,6 +924,9 @@ class App:
                     self.current_tab = TRACK_TAB
                     self.update_tabs()
 
+                if self.current_tab == SETTINGS_TAB and event.endswith('_Enter'):
+                    self.update_settings(values)
+                    
                 # End program if user closes window or
                 # presses the OK button
                 if event in [sg.WIN_CLOSED, 'CLOSE', 'OK']:
