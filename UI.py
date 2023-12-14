@@ -852,7 +852,10 @@ class App:
 
         for entry in self.settings.entries:
             self.window[entry.cur_val_key].update(value=self.settings.get(entry.input_key))
-            self.window[entry.input_key].update(value='')
+            if entry.type == bool:
+                self.window[entry.input_key].update(value=self.settings.get(entry.input_key))
+            else:
+                self.window[entry.input_key].update(value='')
 
         self.window[PATIENCE_SLIDER].update(range=(0, self.settings.get(MAX_PATIENCE)))
         self.window[PATIENCE_PROGRESS].update(max=self.settings.get(MAX_PATIENCE_STACK))
