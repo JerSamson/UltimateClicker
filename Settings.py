@@ -141,20 +141,24 @@ class Settings(metaclass=Singleton):
                 if entry.type == int:
                     if value.replace('-','',1).isdigit() and int(value) >= entry.min and int(value) <= entry.max:
                         self.set(entry.input_key, int(value))
+                        self.logger.info(f'Settings.update_settings() - {entry.input_key} updated to {value}')            
                     else:
                         self.logger.warn(f'Settings.update_settings() - invalid value for {entry.input_key} (Should be integer between [{entry.min, entry.max}] but got {value})')            
 
                 elif entry.type == float:
                     if value.replace('.','',1).replace('-','',1).isdigit() and float(value) >= entry.min and float(value) <= entry.max:
                         self.set(entry.input_key, float(value))
+                        self.logger.info(f'Settings.update_settings() - {entry.input_key} updated to {value}')            
                     else:
                         self.logger.warn(f'Settings.update_settings() - invalid value for {entry.input_key} (Should be float between [{entry.min, entry.max}] but got {value})')            
 
                 elif entry.type == str:
                     self.set(entry.input_key, str(value))
+                    self.logger.info(f'Settings.update_settings() - {entry.input_key} updated to {value}')            
 
                 elif entry.type == bool:
                     self.set(entry.input_key, bool(value))
+                    self.logger.info(f'Settings.update_settings() - {entry.input_key} updated to {value}')            
                 
 
 

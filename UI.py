@@ -64,6 +64,7 @@ TOGGLE_TABLE             = '-TOGGLETABLE-'
 COLOR_PREVIEW_SIZE       = (10,2)
      
 TRACK_TAB                = '-TRACK_TAB-'
+PREVIEW_TAB              = '-PREVIEW_TAB-'
      
 SUBMIT_SETTINGS          = '-SUBMIT_SETTINGS-'
 RESET_SETTINGS           = '-RESET_SETTINGS-'
@@ -113,6 +114,18 @@ class App:
 
         # =========================== FAST TAB ===========================
         fast_tab=[[sg.Text('FAST',  size=(self.tab_size_x, self.tab_size_y))]]
+
+        # =========================== PREVIEW TAB ===========================
+        self.preview_graph = sg.Graph(canvas_size=(500,500),
+            enable_events=True,
+            drag_submits=False, key='--',
+            expand_x=False, expand_y=True,
+            background_color='white',
+            visible=False,
+            graph_bottom_left=(0,0),
+            graph_top_right=(100,1000))
+        
+        preview_tab=[[self.preview_graph]]
 
         # =========================== SETTINGS TAB ===========================
         text_width = 20
@@ -349,6 +362,7 @@ class App:
             [sg.Sizer(0,0)],
             [sg.TabGroup([[
                 sg.Tab('Track', track_tab, key=TRACK_TAB, element_justification='center'),
+                # sg.Tab('Preview', preview_tab, key=PREVIEW_TAB, element_justification='left'),
                 sg.Tab('Settings', settings_tab, key=SETTINGS_TAB, element_justification='left')
             ]])],
             [sg.Sizer(0,0)],
@@ -859,7 +873,7 @@ class App:
 
         self.window[PATIENCE_SLIDER].update(range=(0, self.settings.get(MAX_PATIENCE)))
         self.window[PATIENCE_PROGRESS].update(max=self.settings.get(MAX_PATIENCE_STACK))
-
+        self.logger.set_log_level(self.settings.get(LOG_LEVEL))
 
     def run(self):
         try:
@@ -873,6 +887,7 @@ class App:
                 start = time.time()
                 timeout = 250 if not self.running else self.settings.get(UI_UPDATE)
                 event, values = self.window.read(timeout=timeout, timeout_key='NA')
+
                 if event != 'NA':
                     self.logger.info(f'UI.run() - Handling event [{event}]')
 
