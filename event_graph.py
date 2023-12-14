@@ -267,6 +267,7 @@ class EventGraph(metaclass=Singleton):
 
             if self.has_cps_entries():
                 self.draw_cps()
-                self.draw_stats()
+                if self.settings.get(ADVANCED_GRAPH_INFO):
+                    self.draw_stats()
 
             self.draw_runtime()

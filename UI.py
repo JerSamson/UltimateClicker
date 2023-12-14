@@ -128,11 +128,13 @@ class App:
         trigger_rate_setting        = self.settings.add_entry(SettingEntry('Trigger check rate (s)', TRIGGER_CHECK_RATE, TRIGGER_CHECK_RATE_CUR, int, 'Delay (s) between trigger checks (Same as current patience level [-1] by default)\nLow values can affect performances', min=1))
         target_zone_setting         = self.settings.add_entry(SettingEntry('Target zone (px)', TARGET_ZONE, TARGET_ZONE_CUR, int, 'Height and width (px) of the area used to check if target has triggered.', min=2))
         cookie_check_rate_setting   = self.settings.add_entry(SettingEntry('Check freq (s)', GOLD_FREQ, GOLD_FREQ_CUR, int, 'Delay (s) between gold cookie seek', min=1))
+        cookie_check_setting        = self.settings.add_entry(SettingEntry('GOLD DIGGER', GOLD_DIGGER, GOLD_DIGGER_CUR, bool, 'If selected, will periodically check and queue up golden cookies\n(For Cookie Clicker game)'))
         kp_setting                  = self.settings.add_entry(SettingEntry('KP', KP, KP_CUR, float, 'PID P param'))
         ki_setting                  = self.settings.add_entry(SettingEntry('KI', KI, KI_CUR, float, 'PID I param'))
         kd_setting                  = self.settings.add_entry(SettingEntry('KD', KD, KD_CUR, float, 'PID D param'))
 
         log_level_setting           = self.settings.add_entry(SettingEntry('Log level', LOG_LEVEL, LOG_LEVEL_CUR, int, min=0, max=3))
+        adv_graph_setting           = self.settings.add_entry(SettingEntry('Advanced graph', ADVANCED_GRAPH_INFO, ADVANCED_GRAPH_INFO_CUR, bool))
 
 
         self.settings.load()
@@ -173,7 +175,8 @@ class App:
         # Cookie settings
         cookie_settings_layout = [
             cookie_check_rate_setting.layout(),
-            [sg.Checkbox(default=self.settings.check_for_gold_cookie, text='GOLD DIGGER', key=GOLD_DIGGER, size=(text_width,1), tooltip='If selected, will periodically check and queue up golden cookies\n(For Cookie Clicker game)'),sg.Text(key=GOLD_DIGGER_CUR, text=f'{"CLICKING GOLD!!!" if self.settings.check_for_gold_cookie else "Nope.. T_T"}', text_color='light gray', auto_size_text=True)], 
+            cookie_check_setting.layout()
+            # [sg.Checkbox(default=self.settings.check_for_gold_cookie, text='GOLD DIGGER', key=GOLD_DIGGER, size=(text_width,1), tooltip='If selected, will periodically check and queue up golden cookies\n(For Cookie Clicker game)'),sg.Text(key=GOLD_DIGGER_CUR, text=f'{"CLICKING GOLD!!!" if self.settings.check_for_gold_cookie else "Nope.. T_T"}', text_color='light gray', auto_size_text=True)], 
         ]
         cookie_settings = Collapsible('Golden cookies', cookie_settings_layout, COOKIE_FRAME, COLLAPSE_COOKIE_FRAME, True)
         self.collapsibles.append(cookie_settings)
@@ -190,6 +193,7 @@ class App:
         # DEBUG settings
         debug_settings_layout = [
             log_level_setting.layout(),
+            adv_graph_setting.layout()
         ]
         debug_settings = Collapsible('Debug', debug_settings_layout, DEBUG_FRAME, COLLAPSE_DEBUG_FRAME, True)
         self.collapsibles.append(debug_settings)
@@ -361,7 +365,8 @@ class App:
 
         for setting in self.settings.entries:
             self.window[setting.input_key].bind("<Return>", "_Enter")
-            
+        self.update_settings()
+        
     def toggle_collapsible(self, collapsible:Collapsible, collapse=None):
         if collapse is None:
             collapsible.collapsed = not collapsible.collapsed
@@ -841,7 +846,7 @@ class App:
     def remove_target(self, tar):
         self.queue.remove_target(tar)
 
-    def update_settings(self, values):
+    def update_settings(self, values=None):
 
         self.settings.update_settings(values=values)
 
@@ -859,15 +864,8 @@ class App:
         self.window[TRIGGER_CHECK_RATE_CUR].update(value=display_value)
         self.window[TRIGGER_CHECK_RATE].update(value='')
 
-        value = values[GOLD_DIGGER]
-        if value != '':
-            if isinstance(value, bool):
-                self.settings.check_for_gold_cookie = value
-
-            else:
-                self.logger.warn(f'UI.update_settings - invalid GOLD_DIGGER value ({value})')
+        self.window[GOLD_DIGGER].update(value=self.settings.get(GOLD_DIGGER))
         self.window[GOLD_DIGGER_CUR].update(value=f'{"CLICKING GOLD!!!" if self.settings.check_for_gold_cookie else "Nope.. T_T"}')
-
 
         self.window[GOLD_FREQ_CUR].update(value=self.settings.get(GOLD_FREQ))
         self.window[GOLD_FREQ].update(value='')
@@ -901,6 +899,8 @@ class App:
 
         self.window[LOG_LEVEL_CUR].update(value=self.settings.get(LOG_LEVEL))
         self.window[LOG_LEVEL].update(value='')
+        self.window[ADVANCED_GRAPH_INFO].update(value=self.settings.get(ADVANCED_GRAPH_INFO))
+        self.window[ADVANCED_GRAPH_INFO_CUR].update(value=self.settings.get(ADVANCED_GRAPH_INFO))
 
     def run(self):
         try:

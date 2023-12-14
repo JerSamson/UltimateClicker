@@ -67,6 +67,8 @@ DEBUG_FRAME              = '-DEBUG_FRAME-'
 COLLAPSE_DEBUG_FRAME     = '-COLLAPSE_DEBUG_FRAME-'
 LOG_LEVEL                = '-LOG_LEVEL-'  
 LOG_LEVEL_CUR            = '-LOG_LEVEL_CUR-'  
+ADVANCED_GRAPH_INFO      = '-ADVANCED_GRAPH_INFO-'
+ADVANCED_GRAPH_INFO_CUR  = '-ADVANCED_GRAPH_INFO_CUR-'
 
 class SettingEntry:
     def __init__(self, text, input_key, cur_val_key, type, tooltip=None, text_width=20, text_color='light gray', min=-math.inf, max=math.inf) -> None:
@@ -82,11 +84,18 @@ class SettingEntry:
         self.max = max
         
     def layout(self):
-        return [
-            sg.Text(text=self.text, size=(self.text_width,1), tooltip=self.tooltip),
-            sg.InputText(key=self.input_key, size=(15,1)),
-            sg.Text(key=self.cur_val_key, text=self.cur_value, text_color=self.text_color, auto_size_text=True)
-            ]
+        if self.type == bool:
+            return [
+                sg.Checkbox(text=self.text, key=self.input_key, size=(self.text_width,1), tooltip=self.tooltip),
+                sg.Text(key=self.cur_val_key, text=self.cur_value, text_color=self.text_color, auto_size_text=True)
+                ]
+        else:
+            return [
+                sg.Text(text=self.text, size=(self.text_width,1), tooltip=self.tooltip),
+                sg.InputText(key=self.input_key, size=(15,1)),
+                sg.Text(key=self.cur_val_key, text=self.cur_value, text_color=self.text_color, auto_size_text=True)
+                ]
+
 
 class Settings(metaclass=Singleton):
     def __init__(self) -> None:
@@ -124,6 +133,8 @@ class Settings(metaclass=Singleton):
         return os.path.isfile(self.userdata_file) 
 
     def update_settings(self, values):
+        if values is None:
+            return
         for entry in self.entries:
             value = values[entry.input_key]
             if value != '':
@@ -142,6 +153,10 @@ class Settings(metaclass=Singleton):
                 elif entry.type == str:
                     self.set(entry.input_key, str(value))
 
+                elif entry.type == bool:
+                    self.set(entry.input_key, bool(value))
+                
+
 
     def get(self, key):
         entries = [e for e in self.entries if e.input_key == key]
@@ -151,6 +166,8 @@ class Settings(metaclass=Singleton):
                 return int(entry.cur_value)
             elif entry.type == float:
                 return float(entry.cur_value)
+            elif entry.type == bool:
+                return str(entry.cur_value).lower() == 'true'
             elif entry.type == str:
                 return entry.cur_value
         else:
