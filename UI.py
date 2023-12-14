@@ -65,8 +65,6 @@ COLOR_PREVIEW_SIZE       = (10,2)
      
 TRACK_TAB                = '-TRACK_TAB-'
      
-
-
 SUBMIT_SETTINGS          = '-SUBMIT_SETTINGS-'
 RESET_SETTINGS           = '-RESET_SETTINGS-'
 SAVE_SETTINGS            = '-SAVE_SETTINGS-'
@@ -79,10 +77,10 @@ def text_color_for_bg(r,g,b):
     
 class App:
     def __init__(self) -> None:
-        self.settings = Settings()
         self.eventgraph = EventGraph(EVENT_GRAPH)  
         self.cam = ScreenRecorder()
         self.logger = Logger()
+        self.settings = Settings()
 
         self.collapsibles = []
         self.last_saved = None
@@ -133,6 +131,9 @@ class App:
         kp_setting                  = self.settings.add_entry(SettingEntry('KP', KP, KP_CUR, float, 'PID P param'))
         ki_setting                  = self.settings.add_entry(SettingEntry('KI', KI, KI_CUR, float, 'PID I param'))
         kd_setting                  = self.settings.add_entry(SettingEntry('KD', KD, KD_CUR, float, 'PID D param'))
+
+        log_level_setting           = self.settings.add_entry(SettingEntry('Log level', LOG_LEVEL, LOG_LEVEL_CUR, int))
+
 
         self.settings.load()
 
@@ -186,6 +187,13 @@ class App:
         pid_settings = Collapsible('PID', pid_settings_layout, PID_FRAME, COLLAPSE_PID_FRAME, True)
         self.collapsibles.append(pid_settings)
 
+        # DEBUG settings
+        debug_settings_layout = [
+            log_level_setting.layout(),
+        ]
+        debug_settings = Collapsible('Debug', debug_settings_layout, DEBUG_FRAME, COLLAPSE_DEBUG_FRAME, True)
+        self.collapsibles.append(debug_settings)
+
         settings_tab= [
             general_settings.permanent_section,
             general_settings.collapsible_section,
@@ -204,6 +212,9 @@ class App:
 
             cookie_settings.permanent_section,
             cookie_settings.collapsible_section,
+
+            debug_settings.permanent_section,
+            debug_settings.collapsible_section,
 
             [
                 sg.Button(button_text='Apply', key=SUBMIT_SETTINGS),
@@ -229,16 +240,17 @@ class App:
             header_font=('Bold, 11'),
             headings=self.toprow,
             auto_size_columns=True,
-            num_rows=20,
+            # num_rows=20,
             col0_width=5,
             key=TARGET_TABLE,
             select_mode=sg.TABLE_SELECT_MODE_EXTENDED,
             show_expanded=True,
             enable_events=True,
             expand_x=True,
-            expand_y=True,
+            # expand_y=True,
             right_click_menu=self.right_click_menu,
-            justification='center'
+            justification='center',
+            visible=False
         )
 
         selection_buttons = [
@@ -539,7 +551,7 @@ class App:
 
     def draw_next(self):
         if self.queue.OneQueue.has_one():
-            next = self.queue.OneQueue[0]
+            next = self.queue.next_target
             if next is not None:
                 self.draw(next[1], self.graph_next)
                 self.last_next_target_drew = next
@@ -575,9 +587,10 @@ class App:
             for coll in self.collapsibles:
                 self.toggle_collapsible(coll, True)     
             self.logger.info(f'UI.update_tabs() - Settings tabs are now hidden')
+        else:
+            self.window[TARGET_TABLE].update(visible=False)
 
         track_visible = self.current_tab == TRACK_TAB
-        self.window[TARGET_TABLE].update(visible=track_visible)
 
 
     def update_buttons(self):
@@ -669,6 +682,9 @@ class App:
                 priority = 'INFINITE'
                 treedata.insert("Idle", str(tar.targetid),str(tar.targetid), [priority, "Idle", tar.times_clicked, state]) #str(tar.pos())])
 
+        # num_row = len(self.targets) if len(self.targets) <= 20 else 20
+        # self.target_table.NumRows = num_row
+        # self.target_table.TreeData = treedata
         self.window[TARGET_TABLE].update(values=treedata)
 
     def update_run_details(self):
@@ -961,6 +977,16 @@ class App:
                 self.logger.warn(f'UI.update_settings - invalid KD value ({value})')
         self.window[KD_CUR].update(value=self.settings.get(KD))
         self.window[KD].update(value='')
+
+        value = values[LOG_LEVEL]
+        if value != '':
+            if value.isdigit() and int(value) >= 0:
+                self.settings.set(LOG_LEVEL, int(value))
+                self.logger.set_log_level(int(value))
+            else:
+                self.logger.warn(f'UI.update_settings - invalid log level value ({value})')
+        self.window[LOG_LEVEL_CUR].update(value=self.settings.get(LOG_LEVEL))
+        self.window[LOG_LEVEL].update(value='')
 
     def run(self):
         try:

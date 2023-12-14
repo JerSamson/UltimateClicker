@@ -96,6 +96,18 @@ class EventGraph(metaclass=Singleton):
         else:
             return 0
         
+    def max_cps_entry(self):
+        if len(self.cps_entries) > 0:
+            return max([entry.cps for entry in self.cps_entries])
+        else:
+            return 0
+        
+    def min_cps_entry(self):
+        if len(self.cps_entries) > 0:
+            return min([entry.cps for entry in self.cps_entries])
+        else:
+            return 0
+        
     def max_cps_entry_timestamp(self):
         if len(self.cps_entries) > 0:
             return max([entry.timestamp for entry in self.cps_entries])
@@ -236,6 +248,10 @@ class EventGraph(metaclass=Singleton):
         text = self.seconds_to_days_etc(self.settings.run_time)
         self.graph.DrawText(text, location=(0,0), text_location=sg.TEXT_LOCATION_BOTTOM_LEFT, font=('Terminal'))
 
+    def draw_stats(self):
+        text = f'[{self.min_cps_entry()}, {self.max_cps_entry()}]'
+        self.graph.DrawText(text, location=(0,self.canvas_size[1]), text_location=sg.TEXT_LOCATION_TOP_LEFT, font=('Terminal'), color='gray')
+
     @jit(target_backend='cuda', forceobj=True)
     def update(self):
         if self.has_new_entries():
@@ -249,5 +265,6 @@ class EventGraph(metaclass=Singleton):
 
             if self.has_cps_entries():
                 self.draw_cps()
+                self.draw_stats()
 
             self.draw_runtime()

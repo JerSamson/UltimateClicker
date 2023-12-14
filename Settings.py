@@ -3,7 +3,7 @@ from singleton import Singleton
 import PySimpleGUI as sg
 import xml.etree.ElementTree as ET
 from bs4 import BeautifulSoup
-from logger import Logger
+import logger
 import os.path
 
 # SETTINGS    
@@ -53,13 +53,19 @@ GOLD_FREQ_CUR            = '-GOLD_FREQ_CUR-'
 
 #   PID
 PID_FRAME                = '-PID_FRAME-'
-COLLAPSE_PID_FRAME       = '-COLLAPSE__PID_FRAME-'
+COLLAPSE_PID_FRAME       = '-COLLAPSE_PID_FRAME-'
 KP                       = '-KP-'
 KP_CUR                   = '-KP_CUR-'
 KI                       = '-KI-'
 KI_CUR                   = '-KI_CUR-'
 KD                       = '-KD-'
 KD_CUR                   = '-KD_CUR-'
+
+#   DEBUG
+DEBUG_FRAME              = '-DEBUG_FRAME-'
+COLLAPSE_DEBUG_FRAME     = '-COLLAPSE_DEBUG_FRAME-'
+LOG_LEVEL                = '-LOG_LEVEL-'  
+LOG_LEVEL_CUR            = '-LOG_LEVEL_CUR-'  
 
 class SettingEntry:
     def __init__(self, text, input_key, cur_val_key, type, tooltip=None, text_width=20, text_color='light gray') -> None:
@@ -82,7 +88,7 @@ class SettingEntry:
 class Settings(metaclass=Singleton):
     def __init__(self) -> None:
         self.entries = []
-        self.logger = Logger()
+        self.logger = logger.Logger()
         self.cwd = os.path.dirname(os.path.realpath(__file__)) + '\\'
         self.userdata_dir = self.cwd + 'UserData\\'
         self.preferences_dir = self.userdata_dir + 'Settings\\'
@@ -117,7 +123,7 @@ class Settings(metaclass=Singleton):
 
     def get(self, key):
         entries = [e for e in self.entries if e.input_key == key]
-        if len(entries) > 0 and isinstance(entries[0], SettingEntry):
+        if len(entries) > 0 and isinstance(entries[0], SettingEntry) and entries[0].cur_value is not None:
             entry = entries[0]
             if entry.type == int:
                 return int(entry.cur_value)
