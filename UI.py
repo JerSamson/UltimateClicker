@@ -850,57 +850,13 @@ class App:
 
         self.settings.update_settings(values=values)
 
-        self.window[SAVE_FOLDER_CUR].update(value=self.settings.get(SAVE_FOLDER))
-        self.window[SAVE_FOLDER].update(value='')
-    
-        self.window[TARGET_ZONE_CUR].update(value=self.settings.get(TARGET_ZONE))
-        self.window[TARGET_ZONE].update(value='')
+        for entry in self.settings.entries:
+            self.window[entry.cur_val_key].update(value=self.settings.get(entry.input_key))
+            self.window[entry.input_key].update(value='')
 
-        self.window[UI_UPDATE_CUR].update(value=self.settings.get(UI_UPDATE))
-        self.window[UI_UPDATE].update(value='')
-
-        current_value = self.settings.get(TRIGGER_CHECK_RATE)
-        display_value = current_value if current_value > 0 else str(current_value) + " (Same as patience)"
-        self.window[TRIGGER_CHECK_RATE_CUR].update(value=display_value)
-        self.window[TRIGGER_CHECK_RATE].update(value='')
-
-        self.window[GOLD_DIGGER].update(value=self.settings.get(GOLD_DIGGER))
-        self.window[GOLD_DIGGER_CUR].update(value=f'{"CLICKING GOLD!!!" if self.settings.check_for_gold_cookie else "Nope.. T_T"}')
-
-        self.window[GOLD_FREQ_CUR].update(value=self.settings.get(GOLD_FREQ))
-        self.window[GOLD_FREQ].update(value='')
-
-        self.window[MAX_PATIENCE_CUR].update(value=self.settings.get(MAX_PATIENCE))
         self.window[PATIENCE_SLIDER].update(range=(0, self.settings.get(MAX_PATIENCE)))
-        self.window[MAX_PATIENCE].update(value='')
-
-        self.window[MAX_PATIENCE_STACK_CUR].update(value=self.settings.get(MAX_PATIENCE_STACK))
         self.window[PATIENCE_PROGRESS].update(max=self.settings.get(MAX_PATIENCE_STACK))
-        self.window[MAX_PATIENCE_STACK].update(value='')
 
-        self.window[TARGET_CPS_CUR].update(value=self.settings.get(TARGET_CPS))
-        self.window[TARGET_CPS].update(value='')
-
-        self.window[CPS_UPDATE_CUR].update(value=self.settings.get(CPS_UPDATE))
-        self.window[CPS_UPDATE].update(value='')
-
-        self.window[AUTOSAVE_FREQ_CUR].update(value=self.settings.get(AUTOSAVE_FREQ))
-        self.window[AUTOSAVE_FREQ].update(value='')
-
-        self.window[KP_CUR].update(value=self.settings.get(KP))
-        self.window[KP].update(value='')
-
-        self.window[KI_CUR].update(value=self.settings.get(KI))
-        self.window[KI].update(value='')
-
-        self.window[KD_CUR].update(value=self.settings.get(KD))
-        self.window[KD].update(value='')
-
-
-        self.window[LOG_LEVEL_CUR].update(value=self.settings.get(LOG_LEVEL))
-        self.window[LOG_LEVEL].update(value='')
-        self.window[ADVANCED_GRAPH_INFO].update(value=self.settings.get(ADVANCED_GRAPH_INFO))
-        self.window[ADVANCED_GRAPH_INFO_CUR].update(value=self.settings.get(ADVANCED_GRAPH_INFO))
 
     def run(self):
         try:
