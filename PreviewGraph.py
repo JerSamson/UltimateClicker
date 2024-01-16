@@ -46,8 +46,7 @@ class PreviewGraph(metaclass=Singleton):
         y = [tar.y for tar in self.targets]
         target_zone = self.settings.get(TARGET_ZONE)
 
-        min_x = 0
-        # min_x = min(x) - target_zone*4
+        min_x = min(x) - target_zone*4
         max_x = max(x) + target_zone*4
         min_y = min(y) - target_zone*4
         max_y = max(y) + target_zone*4
