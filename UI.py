@@ -10,6 +10,7 @@ import cursor
 import csv
 import os 
 
+from PreviewGraph import PreviewGraph
 from Settings import *
 from event_graph import *
 
@@ -61,11 +62,12 @@ PATIENCE_PROGRESS_2      = '-PATIENCE_SMALLINC-'
 NEXT_TARGET              = '-NEXT-'
 TOGGLE_TRACK             = '-TOGGLETRACK-'
 TOGGLE_TABLE             = '-TOGGLETABLE-'
+UPDATE_PREVIEW           = '-UPDATEPREVIEWBUTTON-'
 COLOR_PREVIEW_SIZE       = (10,2)
      
 TRACK_TAB                = '-TRACK_TAB-'
 PREVIEW_TAB              = '-PREVIEW_TAB-'
-     
+PREVIEW_GRAPH            = '-PREVIEW_GRAPH-'
 SUBMIT_SETTINGS          = '-SUBMIT_SETTINGS-'
 RESET_SETTINGS           = '-RESET_SETTINGS-'
 SAVE_SETTINGS            = '-SAVE_SETTINGS-'
@@ -79,6 +81,7 @@ def text_color_for_bg(r,g,b):
 class App:
     def __init__(self) -> None:
         self.eventgraph = EventGraph(EVENT_GRAPH)  
+        self.previewgraph = PreviewGraph(PREVIEW_GRAPH)  
         self.cam = ScreenRecorder()
         self.logger = Logger()
         self.settings = Settings()
@@ -116,16 +119,11 @@ class App:
         fast_tab=[[sg.Text('FAST',  size=(self.tab_size_x, self.tab_size_y))]]
 
         # =========================== PREVIEW TAB ===========================
-        self.preview_graph = sg.Graph(canvas_size=(500,500),
-            enable_events=True,
-            drag_submits=False, key='--',
-            expand_x=False, expand_y=True,
-            background_color='white',
-            visible=False,
-            graph_bottom_left=(0,0),
-            graph_top_right=(100,1000))
-        
-        preview_tab=[[self.preview_graph]]
+
+        preview_tab=[
+            [self.previewgraph.graph, sg.Sizer(0,0)],
+            [sg.Button(key=UPDATE_PREVIEW, button_text='Update screenshot')]
+            ]
 
         # =========================== SETTINGS TAB ===========================
         text_width = 20
@@ -361,7 +359,7 @@ class App:
             [sg.Sizer(0,0)],
             [sg.TabGroup([[
                 sg.Tab('Track', track_tab, key=TRACK_TAB, element_justification='center'),
-                # sg.Tab('Preview', preview_tab, key=PREVIEW_TAB, element_justification='left'),
+                sg.Tab('Preview', preview_tab, key=PREVIEW_TAB, element_justification='left'),
                 sg.Tab('Settings', settings_tab, key=SETTINGS_TAB, element_justification='left')
             ]])],
             [sg.Sizer(0,0)],
@@ -608,10 +606,15 @@ class App:
             for coll in self.collapsibles:
                 self.toggle_collapsible(coll, True)     
             self.logger.info(f'UI.update_tabs() - Settings tabs are now hidden')
-        else:
-            self.window[TARGET_TABLE].update(visible=False)
+
 
         track_visible = self.current_tab == TRACK_TAB
+        if not track_visible:
+            self.window[TARGET_TABLE].update(visible=track_visible)
+
+        preview_visible = self.current_tab == PREVIEW_TAB
+        self.window[PREVIEW_GRAPH].update(visible=preview_visible)
+
 
 
     def update_buttons(self):
@@ -896,6 +899,9 @@ class App:
                 elif values is not None and values[4] == TRACK_TAB and self.current_tab != TRACK_TAB:
                     self.current_tab = TRACK_TAB
                     self.update_tabs()
+                elif values is not None and values[4] == PREVIEW_TAB and self.current_tab != PREVIEW_TAB:
+                    self.current_tab = PREVIEW_TAB
+                    self.update_tabs()
 
                 if self.current_tab == SETTINGS_TAB and event.endswith('_Enter'):
                     self.update_settings(values)
@@ -1025,6 +1031,16 @@ class App:
                 elif event == RESET_SETTINGS:
                     self.settings.reset_userdata()
                     self.update_settings(values)
+                    
+                elif event == UPDATE_PREVIEW:
+                    self.previewgraph.targets = self.targets
+                    self.previewgraph.update()
+
+                    self.window[PREVIEW_GRAPH].set_size(self.previewgraph.canvas_size)
+                    self.window[PREVIEW_GRAPH].change_coordinates(self.previewgraph.bottom_left, self.previewgraph.top_right)
+                    self.window[PREVIEW_GRAPH].CanvasSize = self.previewgraph.canvas_size
+
+                    self.previewgraph.draw()
 
             self.click_listener_thread.stop()
             self.click_listener_thread.join()
