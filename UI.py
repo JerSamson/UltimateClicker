@@ -63,6 +63,10 @@ NEXT_TARGET              = '-NEXT-'
 TOGGLE_TRACK             = '-TOGGLETRACK-'
 TOGGLE_TABLE             = '-TOGGLETABLE-'
 UPDATE_PREVIEW           = '-UPDATEPREVIEWBUTTON-'
+TOGGLE_PREVIEW_VIEW      = '-TOGGLEPREVIEWVIEW-'
+RESOLUTION_SLIDER        = '-RESOLUTIONSLIDER-'
+HIDE_APP_PREVIEW         = '-HIDEAPPPREVIEW-'
+
 COLOR_PREVIEW_SIZE       = (10,2)
      
 TRACK_TAB                = '-TRACK_TAB-'
@@ -121,14 +125,16 @@ class App:
         # =========================== PREVIEW TAB ===========================
 
         preview_tab=[
-            [self.previewgraph.graph, sg.Sizer(0,0)],
-            [sg.Button(key=UPDATE_PREVIEW, button_text='Update screenshot')]
+            [sg.Sizer(0,0), sg.Button(key=UPDATE_PREVIEW, button_text='Update screenshot'),
+              sg.Button(key=TOGGLE_PREVIEW_VIEW, button_text='Full View'),
+              sg.Checkbox(key=HIDE_APP_PREVIEW, text='Hide application', default=True)
+            ],
+            [sg.Sizer(0,0), sg.Slider(range=(0.3, 1), default_value=0.5, resolution=0.1, enable_events=True,
+                orientation='horizontal', key=RESOLUTION_SLIDER, expand_x=True, visible=False)],
+            [sg.Sizer(0,0), self.previewgraph.graph]
             ]
 
         # =========================== SETTINGS TAB ===========================
-        text_width = 20
-        setting_frame_title_color = 'dark slate gray'
-
         save_dir_setting            = self.settings.add_entry(SettingEntry('Save Directory', SAVE_FOLDER, SAVE_FOLDER_CUR, str, 'Directory to load and save data'))
         UI_refresh_setting          = self.settings.add_entry(SettingEntry('UI refresh (ms)', UI_UPDATE, UI_UPDATE_CUR, int, 'Delay (ms) between UI refresh while running.\nLow values can affect performances', min=1))
         autosave_setting            = self.settings.add_entry(SettingEntry('Autosave (s)', AUTOSAVE_FREQ, AUTOSAVE_FREQ_CUR, int, 'Delay (s) between Autosaves (0 for no autosave)', min=0))
@@ -146,7 +152,6 @@ class App:
 
         log_level_setting           = self.settings.add_entry(SettingEntry('Log level', LOG_LEVEL, LOG_LEVEL_CUR, int, min=0, max=3))
         adv_graph_setting           = self.settings.add_entry(SettingEntry('Advanced graph', ADVANCED_GRAPH_INFO, ADVANCED_GRAPH_INFO_CUR, bool))
-
 
         self.settings.load()
 
@@ -337,20 +342,17 @@ class App:
         track_tab=[
             [sg.Sizer(625,0)],
             selection_buttons,
-            [sg.Sizer(0,0)],
             [sg.Sizer(0,0), sg.Text(key=BIG_TOTAL, visible=False, expand_x=True, expand_y=True, font=(detailsFont, 35), justification='center')],
             [sg.Sizer(0,0), sg.Text(key=BIG_CPS, visible=False, expand_x=True, expand_y=True, font=(detailsFont, 22), justification='center', text_color='gold')], #DAA520
             [sg.Sizer(0,0), sg.Text(key=BIG_GOLD, visible=False, expand_x=True, expand_y=True, font=(detailsFont, 16), justification='center', text_color='gold')],
-            [self.eventgraph.graph, sg.Sizer(0,0)],
+            [sg.Sizer(0,0), self.eventgraph.graph],
             [sg.Sizer(0,0), self.patience_slider],
             [sg.Sizer(0,0), sg.ProgressBar(self.queue.patience_level, orientation='h', expand_x=True, size=(20, 5),  key=PATIENCE_PROGRESS_2, visible=False, bar_color='blue')],
             [sg.Sizer(0,0), sg.ProgressBar(self.settings.get(MAX_PATIENCE_STACK), orientation='h', expand_x=True, size=(20, 20), border_width= 3,  key=PATIENCE_PROGRESS, visible=False)],
             details,
-            [self.target_table, sg.Sizer(0,0)],
-            [sg.Sizer(0,0)],
-            
-            [sg.Frame('', bottom_row_frame, visible=True, key=BOTTOM_ROW_FRAME, expand_x=False, border_width=1), sg.Sizer(0,0)],
-            [sg.Button('CLICK!', key=CLICK_BTN, visible=True, expand_x=True, expand_y=True)]
+            [sg.Sizer(0,0), self.target_table],
+            [sg.Sizer(0,0), sg.Frame('', bottom_row_frame, visible=True, key=BOTTOM_ROW_FRAME, expand_x=False, border_width=1)],
+            [sg.Sizer(0,0), sg.Button('CLICK!', key=CLICK_BTN, visible=True, expand_x=True, expand_y=True)]
             
         ]
 
@@ -602,10 +604,11 @@ class App:
 
     def update_tabs(self):
         settings_visible = self.current_tab == SETTINGS_TAB
-        if not settings_visible:  
-            for coll in self.collapsibles:
-                self.toggle_collapsible(coll, True)     
-            self.logger.info(f'UI.update_tabs() - Settings tabs are now hidden')
+        for coll in self.collapsibles:
+            if not settings_visible:  
+                self.toggle_collapsible(coll, True)
+            self.window[coll.event_key].update(visible = settings_visible)
+            self.window[coll.event_key+'Title'].update(visible = settings_visible)
 
 
         track_visible = self.current_tab == TRACK_TAB
@@ -614,6 +617,10 @@ class App:
 
         preview_visible = self.current_tab == PREVIEW_TAB
         self.window[PREVIEW_GRAPH].update(visible=preview_visible)
+        if not preview_visible:
+            self.previewgraph.selected_target = None
+        else:
+            self.update_preview_tab()
 
 
 
@@ -710,6 +717,22 @@ class App:
         # self.target_table.NumRows = num_row
         # self.target_table.TreeData = treedata
         self.window[TARGET_TABLE].update(values=treedata)
+
+    def update_preview_tab(self):
+        self.previewgraph.targets = self.targets
+        self.previewgraph.update()
+
+        if len(self.targets) > 0:
+            self.window[PREVIEW_GRAPH].set_size((self.previewgraph.screen.shape[1],self.previewgraph.screen.shape[0]))
+        else:
+            self.window[PREVIEW_GRAPH].set_size((self.previewgraph.canvas_size[1],self.previewgraph.canvas_size[0]))
+
+        self.window[PREVIEW_GRAPH].change_coordinates(self.previewgraph.bottom_left, self.previewgraph.top_right)
+        self.window[PREVIEW_GRAPH].CanvasSize = self.previewgraph.canvas_size
+
+        winPos_acc = self.window.CurrentLocation(False)
+        winSize = self.window.size
+        self.previewgraph.draw(winPos_acc, winSize)
 
     def update_run_details(self):
         if self.queue.has_fast_target():
@@ -893,13 +916,14 @@ class App:
                 if event != 'NA':
                     self.logger.info(f'UI.run() - Handling event [{event}]')
 
-                if values is not None and values[4] == SETTINGS_TAB and self.current_tab != SETTINGS_TAB:
+                idx = 4
+                if values is not None and values[idx] == SETTINGS_TAB and self.current_tab != SETTINGS_TAB:
                     self.current_tab = SETTINGS_TAB
                     self.update_tabs()
-                elif values is not None and values[4] == TRACK_TAB and self.current_tab != TRACK_TAB:
+                elif values is not None and values[idx] == TRACK_TAB and self.current_tab != TRACK_TAB:
                     self.current_tab = TRACK_TAB
                     self.update_tabs()
-                elif values is not None and values[4] == PREVIEW_TAB and self.current_tab != PREVIEW_TAB:
+                elif values is not None and values[idx] == PREVIEW_TAB and self.current_tab != PREVIEW_TAB:
                     self.current_tab = PREVIEW_TAB
                     self.update_tabs()
 
@@ -1031,31 +1055,44 @@ class App:
                 elif event == RESET_SETTINGS:
                     self.settings.reset_userdata()
                     self.update_settings(values)
-                    
+
                 elif event == UPDATE_PREVIEW:
-                    self.previewgraph.targets = self.targets
-                    self.previewgraph.update()
+                    self.previewgraph.hide_app = values[HIDE_APP_PREVIEW]
+                    self.update_preview_tab()
 
-                    self.window[PREVIEW_GRAPH].set_size(self.previewgraph.canvas_size)
-                    self.window[PREVIEW_GRAPH].change_coordinates(self.previewgraph.bottom_left, self.previewgraph.top_right)
-                    self.window[PREVIEW_GRAPH].CanvasSize = self.previewgraph.canvas_size
+                elif event == PREVIEW_GRAPH:
+                    x, y = values[PREVIEW_GRAPH]
+                    self.previewgraph.process_click(x, y)
+                    self.update_preview_tab()
 
-                    self.previewgraph.draw()
+                elif event == TOGGLE_PREVIEW_VIEW:
+                    self.previewgraph.whole_screen_preview = not self.previewgraph.whole_screen_preview
+                    text = 'Minimal View' if self.previewgraph.whole_screen_preview else 'Full View' 
+                    self.window[TOGGLE_PREVIEW_VIEW].update(text=text)
+                    self.window[RESOLUTION_SLIDER].update(visible=self.previewgraph.whole_screen_preview)
+                    self.previewgraph.hide_app = values[HIDE_APP_PREVIEW]
+                    self.update_preview_tab()
 
-            self.click_listener_thread.stop()
-            self.click_listener_thread.join()
-            self.window.close()
+                elif event == RESOLUTION_SLIDER:
+                    self.previewgraph.fullscreen_ratio = values[RESOLUTION_SLIDER]
+                    self.logger.info(f'UI.run() - Updated full screen preview resolution to ({self.previewgraph.fullscreen_ratio})')
+                    self.previewgraph.hide_app = values[HIDE_APP_PREVIEW]
+                    self.update_preview_tab()
+
 
             if len(self.targets) > 0:
                 self.autosave()
 
-        except Exception as e:
             self.click_listener_thread.stop()
             self.click_listener_thread.join()
             self.window.close()
+
+        except Exception as e:
             raise e
         finally:
-
+            self.click_listener_thread.stop()
+            self.click_listener_thread.join()
+            self.window.close()
             self.logger.info('UI.run() - UI.run() Finished')
         
 if __name__ == '__main__':

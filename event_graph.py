@@ -61,7 +61,7 @@ class EventGraph(metaclass=Singleton):
             graph_top_right=self.top_right,
             enable_events=True,
             drag_submits=False, key=key,
-            expand_x=False, expand_y=True,
+            expand_x=False, expand_y=False,
             background_color='white',
             visible=False)
 

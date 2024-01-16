@@ -363,6 +363,7 @@ class TrackerTarget(BaseTarget):
         return img
 
     def color_acquisition(self, screenshot=None, delay=None):
+        self.logger.info(f'TARGET[{self.targetid}].color_acquisition() - Starting color acquisition thread')
         if delay is not None:
             time.sleep(delay)
 

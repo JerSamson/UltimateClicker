@@ -24,5 +24,5 @@ class Collapsible:
         self.event_key = event_key
         self.collapsed = start_collapsed
 
-        self.collapsible_section = [collapse(layout, layout_key, start_collapsed)]
-        self.permanent_section = [sg.T(SYMBOL_UP, enable_events=True, k=event_key), sg.T(title, enable_events=True)]
+        self.collapsible_section = [sg.Sizer(0,0), collapse(layout, layout_key, start_collapsed)]
+        self.permanent_section = [sg.Sizer(0,0), sg.T(SYMBOL_UP, enable_events=True, k=event_key, visible=not start_collapsed), sg.T(title, enable_events=True, k=event_key+'Title', visible=not start_collapsed)]
