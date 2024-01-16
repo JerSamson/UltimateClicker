@@ -130,7 +130,7 @@ class App:
               sg.Checkbox(key=HIDE_APP_PREVIEW, text='Hide application', default=True)
             ],
             [sg.Sizer(0,0), sg.Slider(range=(0.3, 1), default_value=0.5, resolution=0.1, enable_events=True,
-                orientation='horizontal', key=RESOLUTION_SLIDER, expand_x=True, visible=False)],
+                orientation='horizontal', key=RESOLUTION_SLIDER, expand_x=False, size=(35,20) , visible=False)],
             [sg.Sizer(0,0), self.previewgraph.graph]
             ]
 
