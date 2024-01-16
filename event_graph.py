@@ -212,7 +212,7 @@ class EventGraph(metaclass=Singleton):
             # self.graph.draw_lines([(entry.normalized_timestamp, self.graph.BottomLeft[1])])
 
             if entry.normalized_timestamp > self.bottom_left[0] and entry.normalized_timestamp < self.top_right[0]:
-                self.logger.debug(f'event_graph.draw_event() - Drawing {entry.name} event at normalized ts {entry.normalized_timestamp}')
+                # self.logger.debug(f'event_graph.draw_event() - Drawing {entry.name} event at normalized ts {entry.normalized_timestamp}')
                 if entry.name == '5SecondMarker':
                     ratio = 0.1
                     self.graph.draw_line((entry.normalized_timestamp, self.graph.BottomLeft[1]), (entry.normalized_timestamp, (self.graph.TopRight[1]-self.graph.BottomLeft[1])*ratio), color=color, width=4)
@@ -230,7 +230,7 @@ class EventGraph(metaclass=Singleton):
         max = int(math.ceil(self.max_cps_entry_timestamp()))
         ts_range = max - min 
 
-        self.logger.debug(f'event_graph.draw_seconds() - range={ts_range}')
+        # self.logger.debug(f'event_graph.draw_seconds() - range={ts_range}')
 
         for i in range(ts_range):
             sec_entry = EventEntry(min+i, 'SecondMarker')
@@ -250,8 +250,11 @@ class EventGraph(metaclass=Singleton):
         self.graph.DrawText(text, location=(0,0), text_location=sg.TEXT_LOCATION_BOTTOM_LEFT, font=('Terminal'))
 
     def draw_stats(self):
-        cps_vals = [val.cps for val in self.cps_entries]
-        text = f'[{self.min_cps_entry()}, {self.max_cps_entry()}] pstdev:{round(statistics.pstdev(cps_vals, self.settings.get(TARGET_CPS)), 2)}'
+        try:
+            cps_vals = [val.cps for val in self.cps_entries]
+            text = f'[{self.min_cps_entry()}, {self.max_cps_entry()}] pstdev:{round(statistics.pstdev(cps_vals, self.settings.get(TARGET_CPS)), 2)}'
+        except:
+            text = 'Error'
         self.graph.DrawText(text, location=(0,self.top_right[1]-5), text_location=sg.TEXT_LOCATION_TOP_LEFT, font=('Terminal'), color='gray')
 
     @jit(target_backend='cuda', forceobj=True)

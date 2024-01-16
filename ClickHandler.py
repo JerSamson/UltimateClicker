@@ -7,22 +7,9 @@ from screenrecorder import ScreenRecorder
 from Settings import *
 from event_graph import EventGraph, EventEntry
 from logger import Logger
-
-# def ctype_async_raise(target_tid, exception):
-#     ret = ctypes.pythonapi.PyThreadState_SetAsyncExc(ctypes.c_long(target_tid), ctypes.py_object(exception))
-#     # ref: http://docs.python.org/c-api/init.html#PyThreadState_SetAsyncExc
-#     if ret == 0:
-#         raise ValueError("Invalid thread ID")
-#     elif ret > 1:
-#         # Huh? Why would we notify more than one threads?
-#         # Because we punch a hole into C level interpreter.
-#         # So it is better to clean up the mess.
-#         ctypes.pythonapi.PyThreadState_SetAsyncExc(target_tid, None)
-#         raise SystemError("PyThreadState_SetAsyncExc failed")
     
 class SelfDestructException(Exception):
     pass
-
 
 class ClickHandler:
     def __init__(self) -> None:
@@ -349,6 +336,10 @@ class ClickHandler:
         self.logger.info('ClickHandler.SeekAndClickGOOOOLD() - GOLD DIGGER thread started')
         normal_wait = self.settings.get(GOLD_FREQ)
         streak_cnt = 0
+        streak_inc = 0.5
+        streak = 0
+        non_streak = 0
+        streak_tolerance = 3
         # TODO : Streak up to near 0 sec delay
         while self.running:
             try:
@@ -369,17 +360,25 @@ class ClickHandler:
                         self.has_update = True
 
                         streak_cnt = normal_wait
+                        streak += 1
+                        non_streak = 0
                         self.logger.info(f'ClickHandler.SeekAndClickGOOOOLD() - STREAK - Updated delay between check to {normal_wait-streak_cnt}s')
                     else:
-                        if streak_cnt >= 0.5:
-                            streak_cnt -= 0.5
+                        non_streak += 1
+                        if non_streak >= streak_tolerance and streak_cnt >= streak_inc:
+                            streak_cnt -= streak_inc
                             self.logger.info(f'ClickHandler.SeekAndClickGOOOOLD() - NON STREAK - Updated delay between check to {normal_wait-streak_cnt}s')
 
                         self.logger.info('Dismissing golden cookie because it seems to be the same as the last one detected')
                 else:
-                    if streak_cnt >= 0.5:
-                        streak_cnt -= 0.5
-                        self.logger.info(f'ClickHandler.SeekAndClickGOOOOLD() - NON STREAK - Updated delay between check to {normal_wait-streak_cnt}s')
+                    non_streak += 1
+                    if non_streak >= streak_tolerance and streak_cnt >= streak_inc:
+                        streak_cnt -= streak_inc
+                        if streak > 0:
+                            self.logger.info(f'ClickHandler.SeekAndClickGOOOOLD() - {streak} STREAK ENDED - Updated delay between check to {normal_wait-streak_cnt}s')
+                            streak = 0
+                        else:
+                            self.logger.info(f'ClickHandler.SeekAndClickGOOOOLD() - NON STREAK - Updated delay between check to {normal_wait-streak_cnt}s')
                 
                 stop = time.time()
                 actual_wait = (normal_wait-streak_cnt) - (start-stop)

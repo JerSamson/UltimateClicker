@@ -189,7 +189,6 @@ class App:
         cookie_settings_layout = [
             cookie_check_rate_setting.layout(),
             cookie_check_setting.layout()
-            # [sg.Checkbox(default=self.settings.check_for_gold_cookie, text='GOLD DIGGER', key=GOLD_DIGGER, size=(text_width,1), tooltip='If selected, will periodically check and queue up golden cookies\n(For Cookie Clicker game)'),sg.Text(key=GOLD_DIGGER_CUR, text=f'{"CLICKING GOLD!!!" if self.settings.check_for_gold_cookie else "Nope.. T_T"}', text_color='light gray', auto_size_text=True)], 
         ]
         cookie_settings = Collapsible('Golden cookies', cookie_settings_layout, COOKIE_FRAME, COLLAPSE_COOKIE_FRAME, True)
         self.collapsibles.append(cookie_settings)

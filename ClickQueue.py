@@ -76,7 +76,7 @@ class ClickQueue(PriorityQueue):
                 self.put_nowait(tar)
                 self.logger.info(f'ClickerQueue.add_if_unique() - Added ID[{tar[1].targetid}] to queue')
                 return True
-            self.logger.warn(f'ClickerQueue.add_if_unique() - ID[{tar[1].targetid}] was already in queue')
+            # self.logger.warn(f'ClickerQueue.add_if_unique() - ID[{tar[1].targetid}] was already in queue')
             return False
 
     def first_id(self):
