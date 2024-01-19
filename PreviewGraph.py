@@ -177,11 +177,12 @@ class PreviewGraph(metaclass=Singleton):
 
             self.logger.info(f'PreviewGraph.draw_targets() - drawing at [{x},{y}]')
 
+            color = 'blue' if tar is self.selected_target else 'green' if tar.enabled else 'red'
 
-            color = 'red' if tar is not self.selected_target else 'blue'
             if isinstance(tar, TrackerTarget):
-                self.graph.draw_circle((x,y), tar.zone_area, line_color=color, fill_color=color, line_width=3)
+                self.graph.draw_circle((x,y), tar.zone_area, line_color='white', fill_color=color, line_width=1)
             elif isinstance(tar, FastTarget):
+                self.graph.draw_line((x-11,y), (x+11,y), color='white', width=5)
+                self.graph.draw_line((x,y-11), (x,y+11), color='white', width=5)
                 self.graph.draw_line((x-10,y), (x+10,y), color=color, width=3)
                 self.graph.draw_line((x,y-10), (x,y+10), color=color, width=3)
-            
