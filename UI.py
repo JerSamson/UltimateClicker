@@ -152,6 +152,7 @@ class App:
 
         log_level_setting           = self.settings.add_entry(SettingEntry('Log level', LOG_LEVEL, LOG_LEVEL_CUR, int, min=0, max=3))
         adv_graph_setting           = self.settings.add_entry(SettingEntry('Advanced graph', ADVANCED_GRAPH_INFO, ADVANCED_GRAPH_INFO_CUR, bool))
+        custom_cursor_setting       = self.settings.add_entry(SettingEntry('Custom cursors', CUSTOM_CURSOR, CUSTOM_CURSOR_CUR, bool))
 
         self.settings.load()
 
@@ -159,7 +160,8 @@ class App:
         general_settings_layout = [
             save_dir_setting.layout(),
             UI_refresh_setting.layout(),
-            autosave_setting.layout()
+            autosave_setting.layout(),
+            custom_cursor_setting.layout()
         ]
         general_settings = Collapsible('General', general_settings_layout, GENERAL_FRAME, COLLAPSE_GENERAL_FRAME, True)
         self.collapsibles.append(general_settings)
@@ -175,7 +177,10 @@ class App:
         # CPS settings
         cps_settings_layout = [
             target_cps_setting.layout(),
-            cps_update_setting.layout()
+            cps_update_setting.layout(),
+            kp_setting.layout(),
+            ki_setting.layout(),
+            kd_setting.layout()
         ]
         cps_settings = Collapsible('CPS', cps_settings_layout, CPS_FRAME, COLLAPSE_CPS_FRAME, True)
         self.collapsibles.append(cps_settings)
@@ -196,14 +201,14 @@ class App:
         cookie_settings = Collapsible('Golden cookies', cookie_settings_layout, COOKIE_FRAME, COLLAPSE_COOKIE_FRAME, True)
         self.collapsibles.append(cookie_settings)
 
-        # PID settings
-        pid_settings_layout = [
-            kp_setting.layout(),
-            ki_setting.layout(),
-            kd_setting.layout()
-        ]
-        pid_settings = Collapsible('PID', pid_settings_layout, PID_FRAME, COLLAPSE_PID_FRAME, True)
-        self.collapsibles.append(pid_settings)
+        # # PID settings
+        # pid_settings_layout = [
+        #     kp_setting.layout(),
+        #     ki_setting.layout(),
+        #     kd_setting.layout()
+        # ]
+        # pid_settings = Collapsible('PID', pid_settings_layout, PID_FRAME, COLLAPSE_PID_FRAME, True)
+        # self.collapsibles.append(pid_settings)
 
         # DEBUG settings
         debug_settings_layout = [
@@ -226,8 +231,8 @@ class App:
             cps_settings.permanent_section,
             cps_settings.collapsible_section,
 
-            pid_settings.permanent_section,
-            pid_settings.collapsible_section,
+            # pid_settings.permanent_section,
+            # pid_settings.collapsible_section,
 
             cookie_settings.permanent_section,
             cookie_settings.collapsible_section,
@@ -374,7 +379,8 @@ class App:
         font = ("Arial", 12)
 
         # Create the window
-        self.window = sg.Window("UltimateClicker", layout, location=(1100,100), font=font, element_justification='center', finalize=True)
+        self.window = sg.Window("UltimateClicker", layout, location=(1100,100), font=font, element_justification='center',
+                                icon='C:\\Users\\jsamson\\Documents\\GitLabProjects\\UC\\Assets\\icon.ico', finalize=True)
 
         for setting in self.settings.entries:
             self.window[setting.input_key].bind("<Return>", "_Enter")
@@ -658,6 +664,8 @@ class App:
             self.logger.error(f'UI.update_buttons() - Could not run update button ({e})')            
 
     def update_cursor(self):
+        if not self.settings.get(CUSTOM_CURSOR):
+            return
         if self.setting_targets:
             cursor.set_cursor_circle()
         else:

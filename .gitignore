@@ -3,3 +3,6 @@ SavedTargets
 last_save
 user_settings.xml
 preview_screenshot.png
+build
+dist
+*.spec
